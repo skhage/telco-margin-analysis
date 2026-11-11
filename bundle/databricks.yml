@@ -1,0 +1,46 @@
+# Lakelink Fiber - Margin Truth (telco-margin-analysis)
+# Declarative Automation Bundle skeleton (P0-REPO-DAB-SKELETON).
+#
+# HARD RULE: this bundle deploys into EXISTING Unity Catalog schemas only.
+#   - tables, UC functions, volume margin_documents -> ${var.catalog}.${var.schema} (prefix margin_)
+#   - metric views                                   -> ${var.catalog}.${var.metrics_schema} (prefix margin_)
+# Never add `schemas:` (or `catalogs:`) resources to this bundle. @qa audits this.
+#
+# Resource files are added under resources/ using <name>.<resource_type>.yml:
+#   margin_pipeline.pipeline.yml     ONE SDP pipeline (bronze/silver/gold -> margin_ledger)
+#   margin_functions.job.yml         job that (re)creates margin_ UC functions
+#   margin_scorecard.dashboard.yml   ONE AI/BI dashboard (CFO scorecard + $1B Wall)
+#   margin_app.app.yml               ONE Databricks App (approval queue + margin explorer)
+#   margin_genie (Genie agent)       exported space config, deployed by job/script (see README.md)
+# Secrets and tokens are NEVER committed; use secret scopes or app resources.
+
+bundle:
+  name: telco_margin_analysis
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Existing Unity Catalog catalog for all project assets.
+    default: cdm_tmforum
+  schema:
+    description: Existing schema for margin_ tables, UC functions, and the margin_documents volume.
+    default: revenue_assurance
+  metrics_schema:
+    description: Existing schema for margin_ metric views.
+    default: _metrics
+  project_tag:
+    description: Value for the telco_project tag applied to every project asset.
+    default: margin_analysis
+
+presets:
+  tags:
+    telco_project: ${var.project_tag}
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      root_path: ~/.bundle/${bundle.name}/${bundle.target}
