@@ -47,6 +47,13 @@ td.num, th.num { text-align: right; }
 .neg { color: var(--llf-negative); font-weight: 600; }
 .llf-state { color: var(--llf-muted); padding: var(--llf-space-3); text-align: center; }
 .llf-error { color: var(--llf-negative); }
+/* DSN-APP-A11Y-R2 item 2: visible table captions (muted, 13px, left) */
+.llf-caption { caption-side: top; text-align: left; color: var(--llf-muted); font-size: 13px; padding: 0 0 var(--llf-space-1) 0; }
+/* DS-APP-UX-POLISH item 1: status badges (text label, AA ink colors, not color-only) */
+.llf-badge { display: inline-block; padding: 2px var(--llf-space-1); border-radius: 999px; font-size: 13px; font-weight: 600; border: 1px solid currentColor; background: var(--llf-card); }
+.llf-badge--pending { color: var(--llf-secondary); }
+.llf-badge--approved { color: var(--llf-positive); }
+.llf-badge--rejected { color: var(--llf-negative); }
 .llf-genie { width: 100%; height: min(640px, 75vh); border: 1px solid var(--llf-border); border-radius: var(--llf-radius); }
 body, main { overflow-wrap: anywhere; }
 .llf-header h1 { min-width: 0; }

@@ -1,5 +1,5 @@
 // Lakelink Fiber Margin Truth - ONE app: Approval Queue | Margin Explorer | Margin Genie (+ evidence panel after approval)
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 type Ticket = {
   ticket_id: string; ticket_type: string; approver_role: string; title: string;
@@ -22,8 +22,17 @@ const DIMENSIONS: [string, string][] = [
   ["region", "Sales Region"], ["network_type", "Network Type"], ["ledger_quarter", "Quarter"], ["vendor_id", "Vendor ID"],
 ];
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-const fmtUsd = (v: string | null) => (v == null ? "-" : usd.format(Number(v)));
-const fmtPct = (v: string | null) => (v == null ? "-" : `${(Number(v) * 100).toFixed(1)}%`);
+// Missing values: em dash announced as 'not available' (DS-APP-UX-POLISH item 2)
+const NotAvailable = () => <span role="img" aria-label="not available">—</span>;
+const orNA = (v: ReactNode | null | undefined): ReactNode => (v == null || v === "" ? <NotAvailable /> : v);
+const fmtUsd = (v: string | null): ReactNode => (v == null ? <NotAvailable /> : usd.format(Number(v)));
+const fmtPct = (v: string | null): ReactNode => (v == null ? <NotAvailable /> : `${(Number(v) * 100).toFixed(1)}%`);
+// Status badge in sentence case (DS-APP-UX-POLISH item 1)
+const sentence = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s);
+const StatusBadge = ({ status }: { status: string }) => (
+  <span className={`llf-badge llf-badge--${status.toLowerCase()}`}>{sentence(status)}</span>
+);
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, { ...init, headers: { "Content-Type": "application/json" } });
@@ -48,11 +57,11 @@ function ApprovalQueue() {
 
   const load = useCallback(() => {
     setTickets(null); setError(null);
-    api<Ticket[]>(`/api/tickets?role=${encodeURIComponent(role)}&status=${status}`).then(setTickets).catch((e) => setError(e.message));
+    api<Ticket[]>(`/api/tickets?role=${encodeURIComponent(role)}&status=${status}`).then(setTickets).catch((e) => setError(`Approval queue unavailable. Try again, or check that the Lakebase approval database is reachable. (${e.message})`));
   }, [role, status]);
   useEffect(load, [load]);
 
-  const showEvidence = (id: string) => api<Evidence>(`/api/tickets/${encodeURIComponent(id)}/evidence`).then(setEvidence).catch((e) => setError(e.message));
+  const showEvidence = (id: string) => api<Evidence>(`/api/tickets/${encodeURIComponent(id)}/evidence`).then(setEvidence).catch((e) => setError(`Evidence could not be loaded. Try again in a moment. (${e.message})`));
   const decide = async (id: string, title: string, decision: "approved" | "rejected") => {
     if (savingId) return; // prevents double submit
     setSavingId(id); setAnnounce("");
@@ -62,7 +71,7 @@ function ApprovalQueue() {
       load();
       if (decision === "approved") { focusEvidence.current = true; await showEvidence(id); }
     } catch (e) {
-      setError((e as Error).message);
+      setError(`Decision not saved for ${title}. Try again; if it repeats, the ticket may already be decided. (${(e as Error).message})`);
       setAnnounce(`Could not save the decision for ${title}. Try again.`);
     } finally { setSavingId(null); }
   };
@@ -91,15 +100,15 @@ function ApprovalQueue() {
       {tickets && tickets.length > 0 && (
         <div className="llf-card llf-table-wrap">
           <table>
-            <caption className="llf-state" style={{ textAlign: "left", padding: 0 }}>{tickets.length} ticket(s)</caption>
+            <caption className="llf-state" style={{ textAlign: "left", padding: 0 }}>{plural(tickets.length, "ticket", "tickets")}</caption>
             <thead><tr><th>Ticket</th><th>Circuit</th><th>Vendor</th><th className="num">Monthly cost</th><th className="num">Est. monthly savings</th><th>Agent</th><th>Status</th><th>Action</th></tr></thead>
             <tbody>
               {tickets.map((t) => (
                 <tr key={t.ticket_id}>
                   <td><strong>{t.title}</strong><br /><small>{t.ticket_id}</small></td>
-                  <td>{t.circuit_id ?? "-"}</td><td>{t.vendor_id ?? "-"}</td>
+                  <td>{orNA(t.circuit_id)}</td><td>{orNA(t.vendor_id)}</td>
                   <td className="num">{fmtUsd(t.monthly_cost)}</td><td className="num">{fmtUsd(t.est_monthly_savings)}</td>
-                  <td>{t.agent_name}</td><td>{t.status}</td>
+                  <td>{t.agent_name}</td><td><StatusBadge status={t.status} /></td>
                   <td><div className="llf-actions">
                     {t.status === "pending" ? (savingId === t.ticket_id ? (
                       <button className="llf-btn" disabled aria-disabled="true">Saving...</button>
@@ -121,8 +130,8 @@ function ApprovalQueue() {
           <h3 id="ev-h" ref={evidenceHeading} tabIndex={-1}>Evidence for {evidence.ticket.ticket_id}</h3>
           <p><strong>Agent:</strong> {evidence.agentIdentity.name} | <strong>Service principal:</strong> {evidence.agentIdentity.servicePrincipal ?? "not recorded"} {evidence.agentIdentity.applicationId ? `(${evidence.agentIdentity.applicationId})` : ""}</p>
           <p><strong>MLflow trace:</strong> {evidence.traceUrl ? <a href={evidence.traceUrl} target="_blank" rel="noreferrer">Open trace {evidence.ticket.trace_id}</a> : "no trace recorded"}</p>
-          <div className="llf-table-wrap"><table><caption className="llf-sr-only">Audit record</caption><thead><tr><th>When</th><th>Action</th><th>Actor</th><th>Role</th></tr></thead>
-            <tbody>{evidence.audit.map((a, i) => <tr key={i}><td>{new Date(a.at).toLocaleString()}</td><td>{a.action}</td><td>{a.actor}</td><td>{a.actor_role ?? "-"}</td></tr>)}</tbody>
+          <div className="llf-table-wrap"><table><caption className="llf-caption">Audit record</caption><thead><tr><th>When</th><th>Action</th><th>Actor</th><th>Role</th></tr></thead>
+            <tbody>{evidence.audit.map((a, i) => <tr key={i}><td>{new Date(a.at).toLocaleString()}</td><td>{a.action}</td><td>{a.actor}</td><td>{orNA(a.actor_role)}</td></tr>)}</tbody>
           </table></div>
         </section>
       )}
@@ -145,19 +154,19 @@ function MarginExplorer({ metricView }: { metricView: string }) {
       <div className="llf-card"><label>Break down by{" "}
         <select value={dim} onChange={(e) => setDim(e.target.value)}>{DIMENSIONS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
       </label></div>
-      {error && <p role="alert" className="llf-error">Metric view unavailable: {error}</p>}
+      {error && <p role="alert" className="llf-error">Metric view unavailable. Try again or ask in Margin Genie. <small>({error})</small></p>}
       {rows === null && !error && <p className="llf-state" aria-live="polite">Loading margin...</p>}
       {rows?.length === 0 && <p className="llf-state">No ledger rows yet.</p>}
       {rows && rows.length > 0 && (
         <div className="llf-card llf-table-wrap"><table>
-          <caption className="llf-sr-only">Margin by {DIMENSIONS.find(([k]) => k === dim)?.[1]}</caption>
+          <caption className="llf-caption">Margin by {DIMENSIONS.find(([k]) => k === dim)?.[1]}</caption>
           <thead><tr><th>{DIMENSIONS.find(([k]) => k === dim)?.[1]}</th><th className="num">Revenue</th><th className="num">Network Expense</th><th className="num">Cost to Serve</th><th className="num">Contribution Margin</th><th className="num">CM %</th><th className="num">Circuits</th></tr></thead>
           <tbody>{rows.map((r, i) => (
             <tr key={i}>
-              <td>{r.dimension ?? "(not set)"}</td><td className="num">{fmtUsd(r.revenue)}</td><td className="num">{fmtUsd(r.network_expense)}</td>
+              <td>{orNA(r.dimension)}</td><td className="num">{fmtUsd(r.revenue)}</td><td className="num">{fmtUsd(r.network_expense)}</td>
               <td className="num">{fmtUsd(r.cost_to_serve)}</td>
               <td className={`num ${Number(r.contribution_margin) < 0 ? "neg" : ""}`}>{fmtUsd(r.contribution_margin)}{Number(r.contribution_margin) < 0 ? " (loss)" : ""}</td>
-              <td className="num">{fmtPct(r.cm_pct)}</td><td className="num">{r.circuits ?? "-"}</td>
+              <td className="num">{fmtPct(r.cm_pct)}</td><td className="num">{orNA(r.circuits)}</td>
             </tr>))}</tbody>
         </table></div>
       )}
@@ -166,12 +175,12 @@ function MarginExplorer({ metricView }: { metricView: string }) {
 }
 
 function MarginGenie({ cfg }: { cfg: Config }) {
-  if (!cfg.genieSpaceId) return <p className="llf-state">Margin Genie is being set up. It will appear here once the ONE Margin Genie space is published.</p>;
+  if (!cfg.genieSpaceId) return <p className="llf-state">Margin Genie is being set up. It will appear here when it is published.</p>;
   return (
     <section aria-labelledby="genie-h">
       <h2 id="genie-h">Margin Genie</h2>
       <p>Ask in plain English. Finance, Ops, Sales and Marketing share one Genie and one definition of margin.</p>
-      <iframe title="Margin Genie" className="llf-genie" src={`${cfg.workspaceHost}/genie/rooms/${cfg.genieSpaceId}?isEmbedded=true`} />
+      <iframe title="Lakelink Fiber Margin Genie" className="llf-genie" src={`${cfg.workspaceHost}/genie/rooms/${cfg.genieSpaceId}?isEmbedded=true`} />
     </section>
   );
 }
@@ -201,7 +210,7 @@ export default function App() {
       <nav className="llf-tabs" role="tablist" aria-label="Sections">
         {TABS.map((t, i) => (
           <button key={t} ref={(el) => { tabRefs.current[i] = el; }} id={tabId(i)} role="tab" className="llf-tab"
-            aria-selected={tab === t} aria-controls={panelId(i)} tabIndex={tab === t ? 0 : -1}
+            aria-selected={tab === t} aria-controls={tab === t ? panelId(i) : undefined} tabIndex={tab === t ? 0 : -1}
             onClick={() => setTab(t)} onKeyDown={onTabKey}>{t}</button>
         ))}
       </nav>

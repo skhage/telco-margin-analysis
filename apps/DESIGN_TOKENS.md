@@ -73,7 +73,8 @@ Series 2 and 5 are both warm hues, so charts with 4 or more series must use dire
 ## 7. Voice and copy
 
 * Short, plain, and active. Use sentence case for headings and tabs ("Approval queue", "Margin explorer").
-* Use the governed display names from `margin_ledger_mv`: Revenue, Network Expense, Cost to Serve, Contribution Margin, CM %.
+* Use the governed display names from `margin_ledger_mv`: Revenue, Network Expense, Cost to Serve, Contribution Margin, Contribution Margin %. "CM %" is allowed only as a short label where space is tight (KPI tile subtitles, chart axes), never as a page or widget title.
+* Show category values in title case: "Legacy" / "Strategic", "On-net" / "Off-net". Do not show raw TRUE/FALSE or lowercase codes in any UI, chart legend, or Genie answer table.
 * Say "Lakelink Fiber network" or "our own fiber", never a real carrier name. Translate plan wording such as "approved list" to "Lakelink Fiber approved model list".
 
 ## 8. AI/BI dashboard rules (P3-DASHBOARD)
@@ -87,8 +88,12 @@ Series 2 and 5 are both warm hues, so charts with 4 or more series must use dire
 
 * Title: "Lakelink Fiber Margin Genie". The description names the four personas and says that margin always means contribution margin from the governed metric view.
 * Sample questions: the four persona starters from the plan, with any carrier name in the plan wording replaced by "our own fiber" or "the Lakelink Fiber network".
-* Review of the copy is task DA-GENIE-COPY-REVIEW.
+* Approved description (paste into the space): "Ask Lakelink Fiber margin questions in plain English. One space for Finance, Ops, Sales, and Marketing. Margin always means contribution margin (revenue minus network expense minus cost to serve) from the governed metric view margin_ledger_mv, so every team gets the same number."
+* Approved sample questions, in this order: (1) Finance: "Which product families lost money after cost to serve last quarter?" (2) Ops: "Which off-net circuits run next to our own fiber, and what do we pay for them?" (3) Sales: "Which renewals in the next 90 days are below the margin floor?" (4) Marketing: "Which segments have the highest margin and the most room to grow?"
+* Answers show money in USD with no decimals and percentages with 1 decimal, matching the metric view formats.
+* Copy reviewed under DA-GENIE-COPY-REVIEW (2026-11-12, PASS with changes); remediation in DSN-GENIE-COPY-R1.
 
 ## Change log
 
+* v1.1 2026-11-12 @designer: section 7 adds the Contribution Margin % naming rule and the title-case category value rule; section 9 adds the approved Genie description and the ordered sample questions (DA-GENIE-COPY-REVIEW).
 * v1.0 2026-11-12 @designer: first release. Supersedes the provisional values in `apps/margin-truth/client/tokens.css`. Changes: focus ring moved from accent to #1B3139, border-strong added, viz-5 changed from #FF8C69 to #D9603B, viz-4 changed from #6E8898 to #5F7A8A, viz order now leads with #1B3139.

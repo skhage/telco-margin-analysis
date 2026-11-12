@@ -20,6 +20,13 @@ bundle:
 include:
   - resources/*.yml
 
+# Sources outside bundle/ that resources reference (app source, UC function SQL).
+sync:
+  paths:
+    - .
+    - ../apps/margin-truth
+    - ../agents
+
 variables:
   catalog:
     description: Existing Unity Catalog catalog for all project assets.
@@ -33,6 +40,10 @@ variables:
   project_tag:
     description: Value for the telco_project tag applied to every project asset.
     default: margin_analysis
+  warehouse_id:
+    description: SQL warehouse for the app, UC function job, and dashboard.
+    lookup:
+      warehouse: telco_cdm_model
 
 presets:
   tags:

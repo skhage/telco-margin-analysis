@@ -1,0 +1,15 @@
+# Lakelink Fiber - Margin Truth: the ONE AI/BI dashboard (reserved name 'Lakelink Fiber Margin Truth').
+# DRAFT, commented out: ../dashboards/ is empty (P3-DASHBOARD open). Uncomment when @data-analyst
+# exports the .lvdash.json (CFO scorecard, $1B Wall, challenge cards, embedded Margin Genie).
+#
+# resources:
+#   dashboards:
+#     margin_scorecard:
+#       display_name: Lakelink Fiber Margin Truth
+#       file_path: ../../dashboards/margin_truth.lvdash.json
+#       warehouse_id: ${var.warehouse_id}
+#       dataset_catalog: ${var.catalog}
+#       dataset_schema: ${var.metrics_schema}
+#
+# Margin Genie ('Lakelink Fiber Margin Genie'): space config lives in ../genie/ and is applied by a
+# job task once P3-MARGIN-GENIE creates the ONE space (no separate bundle resource yet).

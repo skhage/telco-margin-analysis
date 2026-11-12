@@ -1,0 +1,16 @@
+# Lakelink Fiber - Margin Truth: the ONE Databricks App (reserved name lakelink-margin-truth).
+# Source: ../../apps/margin-truth (approval queue + margin explorer). DRAFT (DEVOPS-BUNDLE-RESOURCES-DRAFT):
+# deploy only after P3-APP-SCAFFOLD completes (apps.create is a human gate). No secrets here;
+# the app reads Lakebase/warehouse settings from app.yaml env and app resources.
+resources:
+  apps:
+    margin_app:
+      name: lakelink-margin-truth
+      description: Lakelink Fiber Margin Truth - approval queue and margin explorer (telco_project=margin_analysis)
+      source_code_path: ../../apps/margin-truth
+      resources:
+        - name: sql-warehouse
+          description: Warehouse for MEASURE() queries on ${var.catalog}.${var.metrics_schema}.margin_ledger_mv
+          sql_warehouse:
+            id: ${var.warehouse_id}
+            permission: CAN_USE

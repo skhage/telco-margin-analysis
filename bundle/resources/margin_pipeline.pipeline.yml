@@ -1,0 +1,20 @@
+# Lakelink Fiber - Margin Truth: the ONE SDP pipeline (reserved name lakelink_margin_truth_sdp).
+# DRAFT, commented out: ../pipeline/ has no source yet (P1-SDP-PIPELINE open). Uncomment when
+# @data-engineer lands the pipeline source. Target is the EXISTING schema ${var.catalog}.${var.schema}.
+#
+# resources:
+#   pipelines:
+#     margin_pipeline:
+#       name: lakelink_margin_truth_sdp
+#       catalog: ${var.catalog}
+#       schema: ${var.schema}
+#       serverless: true
+#       channel: CURRENT
+#       photon: true
+#       libraries:
+#         - glob:
+#             include: ../../pipeline/**
+#       configuration:
+#         margin.catalog: ${var.catalog}
+#         margin.schema: ${var.schema}
+#         margin.documents_volume: /Volumes/${var.catalog}/${var.schema}/margin_documents
