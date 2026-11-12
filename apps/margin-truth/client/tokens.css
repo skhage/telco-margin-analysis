@@ -1,0 +1,43 @@
+/* Lakelink Fiber design tokens - PROVISIONAL until @designer delivers P3-DESIGN-SYSTEM.
+   Source: Lakelink Fiber brand in the workspace instructions (primary/secondary/accent/surface, 8px grid, WCAG 2.1 AA).
+   Replace values here only; components read the CSS variables. */
+:root {
+  --llf-primary: #ff3621;
+  --llf-primary-ink: #b8200f; /* AA-contrast text/link variant of primary on light surface */
+  --llf-secondary: #1b3139;
+  --llf-accent: #00a972;
+  --llf-accent-ink: #007a52;
+  --llf-surface: #f9f7f4;
+  --llf-card: #ffffff;
+  --llf-border: #d9d4cc;
+  --llf-text: #1b3139;
+  --llf-muted: #5a6b72;
+  --llf-negative: #b8200f;
+  --llf-viz-1: #ff3621; --llf-viz-2: #1b3139; --llf-viz-3: #00a972; --llf-viz-4: #6e8898; --llf-viz-5: #ff8c69;
+  --llf-space-1: 8px; --llf-space-2: 16px; --llf-space-3: 24px; --llf-space-4: 32px;
+  --llf-radius: 8px;
+  --llf-font: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--llf-font); color: var(--llf-text); background: var(--llf-surface); }
+.llf-header { background: var(--llf-secondary); color: #fff; padding: var(--llf-space-2) var(--llf-space-3); display: flex; align-items: center; gap: var(--llf-space-2); }
+.llf-header h1 { font-size: 20px; margin: 0; font-weight: 600; }
+.llf-mark { width: 12px; height: 24px; background: var(--llf-primary); border-radius: 2px; }
+.llf-tabs { display: flex; gap: var(--llf-space-1); padding: 0 var(--llf-space-3); background: var(--llf-card); border-bottom: 1px solid var(--llf-border); }
+.llf-tab { border: 0; background: none; padding: var(--llf-space-2); font: inherit; color: var(--llf-muted); cursor: pointer; border-bottom: 3px solid transparent; min-height: 44px; }
+.llf-tab[aria-selected="true"] { color: var(--llf-text); border-bottom-color: var(--llf-primary); font-weight: 600; }
+.llf-tab:focus-visible, .llf-btn:focus-visible, select:focus-visible { outline: 3px solid var(--llf-accent); outline-offset: 2px; }
+main { padding: var(--llf-space-3); max-width: 1280px; margin: 0 auto; }
+.llf-card { background: var(--llf-card); border: 1px solid var(--llf-border); border-radius: var(--llf-radius); padding: var(--llf-space-2); margin-bottom: var(--llf-space-2); }
+.llf-btn { font: inherit; border-radius: var(--llf-radius); padding: var(--llf-space-1) var(--llf-space-2); min-height: 40px; cursor: pointer; border: 1px solid var(--llf-secondary); background: var(--llf-card); color: var(--llf-secondary); }
+.llf-btn--approve { background: var(--llf-accent-ink); border-color: var(--llf-accent-ink); color: #fff; }
+.llf-btn--reject { color: var(--llf-negative); border-color: var(--llf-negative); }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: var(--llf-space-1); border-bottom: 1px solid var(--llf-border); font-variant-numeric: tabular-nums; }
+th { color: var(--llf-muted); font-weight: 600; font-size: 13px; }
+td.num, th.num { text-align: right; }
+.neg { color: var(--llf-negative); font-weight: 600; }
+.llf-state { color: var(--llf-muted); padding: var(--llf-space-3); text-align: center; }
+.llf-error { color: var(--llf-negative); }
+.llf-genie { width: 100%; height: 640px; border: 1px solid var(--llf-border); border-radius: var(--llf-radius); }
+@media (max-width: 720px) { main { padding: var(--llf-space-2); } .llf-tabs { overflow-x: auto; } }

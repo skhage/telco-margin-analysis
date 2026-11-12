@@ -1,0 +1,192 @@
+# Lakelink Fiber Margin Truth - metric view DRAFT v0.1 (P2-MV-YAML-DRAFT, @data-analyst, 2026-11-12)
+# Deploy target: cdm_tmforum._metrics.margin_ledger_mv  (DEC-001, DEC-002)
+# Built against src/semantics/STANDARDS.md v1.0 (commit f9b2f65). NOT DEPLOYED: waits on P1-LEDGER-GOLD-FASTPATH.
+# Deploy:  CREATE VIEW cdm_tmforum._metrics.margin_ledger_mv WITH METRICS LANGUAGE YAML AS $$ <this body> $$
+#          ALTER VIEW ... SET TAGS ('telco_project' = 'margin_analysis')
+# Later edits: ALTER VIEW ... AS $$ ... $$ (keeps grants), never CREATE OR REPLACE.
+# Contribution margin is defined ONLY here. Every other view, Genie, dashboard, app and agent reads MEASURE(contribution_margin).
+version: 1.1
+comment: >-
+  Lakelink Fiber margin ledger metrics. Grain of the source: customer x product x circuit x month.
+  Contribution margin = revenue - network expense - cost to serve (DEC-002), defined once here.
+  Cost to serve is allocated by margin_allocation_rules, so a rule change moves every answer.
+  Synonyms: margin ledger, P&L by circuit, profitability.
+source: cdm_tmforum.revenue_assurance.margin_ledger
+
+dimensions:
+  - name: ledger_month
+    expr: ledger_month
+    display_name: Month
+    comment: "Ledger month (first day of the month). Use for month, quarter and year filters."
+    format:
+      type: date
+      date_format: locale_short_month
+    synonyms: [month, period, fiscal month]
+  - name: ledger_quarter
+    expr: DATE_TRUNC('QUARTER', ledger_month)
+    display_name: Quarter
+    comment: "Calendar quarter of the ledger month (first day of the quarter). 'Last quarter' = the most recent complete quarter."
+    format:
+      type: date
+      date_format: year_month_day
+    synonyms: [quarter, qtr, fiscal quarter]
+  - name: customer_id
+    expr: customer_id
+    display_name: Customer ID
+    comment: "Lakelink Fiber customer identifier (TMF customer id, matches Salesforce account TMF_Customer_Id__c)."
+    synonyms: [account, account id, customer number]
+  - name: segment
+    expr: segment
+    display_name: Customer Segment
+    comment: "Customer segment: Strategic Enterprise, Enterprise, Commercial, Small Business."
+    synonyms: [market segment, customer tier, segment name]
+  - name: region
+    expr: region
+    display_name: Sales Region
+    comment: "Sales region of the customer."
+    synonyms: [territory, geography, market]
+  - name: product_id
+    expr: product_id
+    display_name: Product ID
+    comment: "Product of the contract line (Salesforce product2 Id, or MGN-PRD- id for synthetic legacy voice products)."
+    synonyms: [product, sku]
+  - name: product_family
+    expr: product_family
+    display_name: Product Family
+    comment: "Product family: Dedicated Internet, Wavelength, Ethernet, IP-VPN, Managed, Colocation, Legacy Voice."
+    synonyms: [family, product line, product group]
+  - name: family_class
+    expr: family_class
+    display_name: Legacy or Strategic
+    comment: "strategic or legacy, taken from the product family. Legacy = IP-VPN (MPLS) and Legacy Voice; all others strategic."
+    synonyms: [legacy vs strategic, portfolio class, product class]
+  - name: contract_id
+    expr: contract_id
+    display_name: Contract Line ID
+    comment: "Contract line (one product for one customer under one agreement). Salesforce contract_line_item Id."
+    synonyms: [contract, contract line, agreement line]
+  - name: circuit_id
+    expr: circuit_id
+    display_name: Circuit ID
+    comment: "Circuit identifier (TMF customer facing service id)."
+    synonyms: [circuit, service id, line]
+  - name: is_on_net
+    expr: is_on_net
+    display_name: On-net
+    comment: "TRUE = circuit rides Lakelink Fiber's own network; FALSE = off-net, rides a third-party vendor."
+    synonyms: [on net flag, own network]
+  - name: network_type
+    expr: CASE WHEN is_on_net THEN 'On-net' ELSE 'Off-net' END
+    display_name: Network Type
+    comment: "On-net (Lakelink Fiber network) or Off-net (third-party vendor). Off-net means the circuit rides a third-party vendor."
+    synonyms: [on-net vs off-net, off net, third-party, leased]
+  - name: vendor_id
+    expr: vendor_id
+    display_name: Vendor ID
+    comment: "Third-party carrier (MGN-VND-###) for off-net circuits; NULL when on-net."
+    synonyms: [carrier, supplier, provider]
+  - name: allocation_rule_version
+    expr: allocation_rule_version
+    display_name: Allocation Rule Version
+    comment: "Version of margin_allocation_rules used to compute cost to serve for this row."
+    synonyms: [rule set, allocation version]
+
+measures:
+  - name: revenue
+    expr: SUM(revenue_usd)
+    display_name: Revenue
+    comment: "Billed revenue, US dollars."
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places: {type: exact, places: 0}
+      abbreviation: compact
+    synonyms: [sales, billings, top line, billed revenue]
+  - name: network_expense
+    expr: SUM(network_expense_usd)
+    display_name: Network Expense
+    comment: "Carrier paid amount for off-net circuits plus on-net network cost, US dollars."
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places: {type: exact, places: 0}
+      abbreviation: compact
+    synonyms: [network cost, access cost, carrier cost, cost of network]
+  - name: cost_to_serve
+    expr: SUM(cost_to_serve_usd)
+    display_name: Cost to Serve
+    comment: "Operating cost allocated to the circuit by margin_allocation_rules (cost pool x driver x weight), US dollars."
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places: {type: exact, places: 0}
+      abbreviation: compact
+    synonyms: [CTS, servicing cost, allocated opex, support cost]
+  - name: contribution_margin
+    expr: MEASURE(revenue) - MEASURE(network_expense) - MEASURE(cost_to_serve)
+    display_name: Contribution Margin
+    comment: "Revenue minus network expense minus cost to serve, US dollars. Defined once here (DEC-002). Negative = loses money after cost to serve."
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places: {type: exact, places: 0}
+      abbreviation: compact
+    synonyms: [margin, CM, profit after cost to serve, contribution]
+  - name: cm_pct
+    expr: MEASURE(contribution_margin) / NULLIF(MEASURE(revenue), 0)
+    display_name: Contribution Margin %
+    comment: "Contribution margin divided by revenue (0.20 = 20%). Compare with the product margin floor."
+    format:
+      type: percentage
+      decimal_places: {type: exact, places: 1}
+    synonyms: [margin percent, CM %, margin rate]
+  - name: expected_revenue
+    expr: SUM(expected_revenue_usd)
+    display_name: Expected Revenue
+    comment: "Revenue the contract rate says should have been billed, US dollars."
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places: {type: exact, places: 0}
+      abbreviation: compact
+    synonyms: [contracted revenue, should-bill]
+  - name: revenue_leakage
+    expr: MEASURE(expected_revenue) - MEASURE(revenue)
+    display_name: Revenue Leakage
+    comment: "Expected revenue minus billed revenue, US dollars. Positive = under-billing."
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places: {type: exact, places: 0}
+      abbreviation: compact
+    synonyms: [leakage, under-billing, billing gap]
+  - name: carrier_rate_variance
+    expr: SUM(carrier_rate_variance_usd)
+    display_name: Carrier Rate Variance
+    comment: "Carrier invoiced rate minus agreed vendor contract rate, US dollars (0 on-net). Positive = vendor overbilled."
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places: {type: exact, places: 0}
+      abbreviation: compact
+    synonyms: [rate variance, overbilling, invoice variance]
+  - name: offnet_network_expense
+    expr: SUM(network_expense_usd) FILTER (WHERE NOT is_on_net)
+    display_name: Off-net Spend
+    comment: "Network expense on off-net circuits only (what Lakelink Fiber pays third-party vendors), US dollars."
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places: {type: exact, places: 0}
+      abbreviation: compact
+    synonyms: [off-net spend, vendor spend, leased circuit cost]
+  - name: circuit_count
+    expr: COUNT(DISTINCT circuit_id)
+    display_name: Circuits
+    comment: "Number of distinct circuits."
+    synonyms: [number of circuits, circuit count]
+  - name: customer_count
+    expr: COUNT(DISTINCT customer_id)
+    display_name: Customers
+    comment: "Number of distinct customers."
+    synonyms: [number of customers, accounts]

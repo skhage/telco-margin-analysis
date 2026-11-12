@@ -1,0 +1,21 @@
+# Lakelink Fiber Margin Truth - the ONE Databricks App for telco-margin-analysis (P3-APP-SCAFFOLD)
+# Build locally/CI with `npm ci && npm run build`; dist/ is deployed.
+command: ["node", "dist/server/index.js"]
+env:
+  # Approval queue: dedicated Lakebase project, public schema only (no new Postgres schemas)
+  - name: LAKEBASE_ENDPOINT
+    value: "projects/telco-margin-analysis-app/branches/production/endpoints/primary"
+  - name: LAKEBASE_HOST
+    value: "ep-calm-king-d2mq878u.database.us-east-1.cloud.databricks.com"
+  - name: LAKEBASE_DB
+    value: "databricks_postgres"
+  # Margin explorer: metric views in cdm_tmforum._metrics (MEASURE() only, DEC-002)
+  - name: DATABRICKS_WAREHOUSE_ID
+    valueFrom: sql-warehouse
+  - name: MARGIN_MV
+    value: "cdm_tmforum._metrics.margin_ledger_mv"
+  # Margin Genie (set when P3-MARGIN-GENIE creates the ONE space)
+  - name: GENIE_SPACE_ID
+    value: ""
+  - name: MLFLOW_EXPERIMENT_ID
+    value: "1235449331932066"

@@ -218,3 +218,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Margin Truth: same-run scratch notebooks/files (DEC-009) are never committed
+scratch/
+
+# Margin Truth: MLflow experiment objects are workspace assets, not git-supported files
+agents/margin_grooming_agent_traces
