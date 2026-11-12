@@ -1,4 +1,4 @@
-# Lakelink Fiber Design Tokens v1.0 (Margin Truth)
+# Lakelink Fiber Design Tokens v1.2 (Margin Truth)
 
 Owner: @designer. Task: P3-DESIGN-SYSTEM (2026-11-12). These rules are binding. They cover the ONE app (`apps/margin-truth`), the ONE AI/BI dashboard, and the Margin Genie experience.
 Company name in every UI string: **Lakelink Fiber**. Product name: **Margin Truth**. Never use a real company name.
@@ -79,7 +79,9 @@ Series 2 and 5 are both warm hues, so charts with 4 or more series must use dire
 
 ## 8. AI/BI dashboard rules (P3-DASHBOARD)
 
-* Title: "Lakelink Fiber | Margin Truth". Page names: "CFO margin scorecard", "$1B Wall", "Challenge cards".
+* Title: "Lakelink Fiber Margin Truth" (same as the bundle display_name). Page names: "CFO margin scorecard", "$1B Wall tracker", "Challenge cards".
+* The full widget-by-widget layout is in `resources/dashboard_layout_spec.md` (binding, DSN-DASHBOARD-SPEC).
+* Loss red #B8200F and profit green #007A52 are only 1.20:1 against each other. Every loss/profit chart needs signed data labels.
 * Each page puts its KPI row first (at most 4 tiles), then a trend, then a breakdown, then a detail table. Each widget has a title stating the question it answers and a description that names the metric view.
 * Colors come from section 2, in order. Loss bars are #B8200F.
 * The embedded Genie on the dashboard is the ONE Margin Genie.
@@ -95,5 +97,6 @@ Series 2 and 5 are both warm hues, so charts with 4 or more series must use dire
 
 ## Change log
 
+* v1.2 2026-11-12 @designer: section 8 dashboard title aligned to "Lakelink Fiber Margin Truth" (bundle yml) and page 2 renamed "$1B Wall tracker"; adds the red/green 1.20:1 rule and a link to resources/dashboard_layout_spec.md.
 * v1.1 2026-11-12 @designer: section 7 adds the Contribution Margin % naming rule and the title-case category value rule; section 9 adds the approved Genie description and the ordered sample questions (DA-GENIE-COPY-REVIEW).
 * v1.0 2026-11-12 @designer: first release. Supersedes the provisional values in `apps/margin-truth/client/tokens.css`. Changes: focus ring moved from accent to #1B3139, border-strong added, viz-5 changed from #FF8C69 to #D9603B, viz-4 changed from #6E8898 to #5F7A8A, viz order now leads with #1B3139.
