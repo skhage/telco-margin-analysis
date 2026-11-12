@@ -1,6 +1,5 @@
-/* Lakelink Fiber design tokens - PROVISIONAL until @designer delivers P3-DESIGN-SYSTEM.
-   Source: Lakelink Fiber brand in the workspace instructions (primary/secondary/accent/surface, 8px grid, WCAG 2.1 AA).
-   Replace values here only; components read the CSS variables. */
+/* Lakelink Fiber design tokens v1.0 - source of truth: apps/DESIGN_TOKENS.md (@designer, P3-DESIGN-SYSTEM).
+   Applied in DS-APP-A11Y-FIXES. Components read the CSS variables only. */
 :root {
   --llf-primary: #ff3621;
   --llf-primary-ink: #b8200f; /* AA-contrast text/link variant of primary on light surface */
@@ -9,11 +8,14 @@
   --llf-accent-ink: #007a52;
   --llf-surface: #f9f7f4;
   --llf-card: #ffffff;
-  --llf-border: #d9d4cc;
+  --llf-border: #d9d4cc; /* decorative dividers only */
+  --llf-border-strong: #8a8378; /* inputs, selects, outline buttons (3.75:1) */
   --llf-text: #1b3139;
   --llf-muted: #5a6b72;
   --llf-negative: #b8200f;
-  --llf-viz-1: #ff3621; --llf-viz-2: #1b3139; --llf-viz-3: #00a972; --llf-viz-4: #6e8898; --llf-viz-5: #ff8c69;
+  --llf-positive: #007a52;
+  --llf-focus: #1b3139;
+  --llf-viz-1: #1b3139; --llf-viz-2: #ff3621; --llf-viz-3: #00a972; --llf-viz-4: #5f7a8a; --llf-viz-5: #d9603b;
   --llf-space-1: 8px; --llf-space-2: 16px; --llf-space-3: 24px; --llf-space-4: 32px;
   --llf-radius: 8px;
   --llf-font: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -26,10 +28,16 @@ body { margin: 0; font-family: var(--llf-font); color: var(--llf-text); backgrou
 .llf-tabs { display: flex; gap: var(--llf-space-1); padding: 0 var(--llf-space-3); background: var(--llf-card); border-bottom: 1px solid var(--llf-border); }
 .llf-tab { border: 0; background: none; padding: var(--llf-space-2); font: inherit; color: var(--llf-muted); cursor: pointer; border-bottom: 3px solid transparent; min-height: 44px; }
 .llf-tab[aria-selected="true"] { color: var(--llf-text); border-bottom-color: var(--llf-primary); font-weight: 600; }
-.llf-tab:focus-visible, .llf-btn:focus-visible, select:focus-visible { outline: 3px solid var(--llf-accent); outline-offset: 2px; }
+.llf-tab:focus-visible, .llf-btn:focus-visible, select:focus-visible, a:focus-visible, [tabindex="-1"]:focus { outline: 3px solid var(--llf-focus); outline-offset: 2px; }
+select { font: inherit; min-height: 40px; padding: 0 var(--llf-space-1); border: 1px solid var(--llf-border-strong); border-radius: var(--llf-radius); background: var(--llf-card); color: var(--llf-text); }
+.llf-panel:focus-visible { outline: 3px solid var(--llf-focus); outline-offset: 2px; }
+.llf-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.llf-table-wrap { overflow-x: auto; max-width: 100%; }
+.llf-actions { display: flex; gap: var(--llf-space-1); flex-wrap: wrap; }
 main { padding: var(--llf-space-3); max-width: 1280px; margin: 0 auto; }
 .llf-card { background: var(--llf-card); border: 1px solid var(--llf-border); border-radius: var(--llf-radius); padding: var(--llf-space-2); margin-bottom: var(--llf-space-2); }
-.llf-btn { font: inherit; border-radius: var(--llf-radius); padding: var(--llf-space-1) var(--llf-space-2); min-height: 40px; cursor: pointer; border: 1px solid var(--llf-secondary); background: var(--llf-card); color: var(--llf-secondary); }
+.llf-btn { font: inherit; border-radius: var(--llf-radius); padding: var(--llf-space-1) var(--llf-space-2); min-height: 40px; cursor: pointer; border: 1px solid var(--llf-border-strong); background: var(--llf-card); color: var(--llf-secondary); }
+.llf-btn:disabled { cursor: not-allowed; opacity: 0.7; }
 .llf-btn--approve { background: var(--llf-accent-ink); border-color: var(--llf-accent-ink); color: #fff; }
 .llf-btn--reject { color: var(--llf-negative); border-color: var(--llf-negative); }
 table { width: 100%; border-collapse: collapse; }
@@ -39,5 +47,12 @@ td.num, th.num { text-align: right; }
 .neg { color: var(--llf-negative); font-weight: 600; }
 .llf-state { color: var(--llf-muted); padding: var(--llf-space-3); text-align: center; }
 .llf-error { color: var(--llf-negative); }
-.llf-genie { width: 100%; height: 640px; border: 1px solid var(--llf-border); border-radius: var(--llf-radius); }
-@media (max-width: 720px) { main { padding: var(--llf-space-2); } .llf-tabs { overflow-x: auto; } }
+.llf-genie { width: 100%; height: min(640px, 75vh); border: 1px solid var(--llf-border); border-radius: var(--llf-radius); }
+body, main { overflow-wrap: anywhere; }
+.llf-header h1 { min-width: 0; }
+@media (max-width: 720px) {
+  main { padding: var(--llf-space-2); }
+  .llf-tabs { overflow-x: auto; padding: 0 var(--llf-space-2); }
+  .llf-table-wrap th:first-child, .llf-table-wrap td:first-child { position: sticky; left: 0; background: var(--llf-card); z-index: 1; }
+  .llf-table-wrap table { min-width: 640px; }
+}

@@ -1,5 +1,5 @@
 // Lakelink Fiber Margin Truth - ONE app: Approval Queue | Margin Explorer | Margin Genie (+ evidence panel after approval)
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 type Ticket = {
   ticket_id: string; ticket_type: string; approver_role: string; title: string;
@@ -38,6 +38,13 @@ function ApprovalQueue() {
   const [tickets, setTickets] = useState<Ticket[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [evidence, setEvidence] = useState<Evidence | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [announce, setAnnounce] = useState("");
+  const evidenceHeading = useRef<HTMLHeadingElement>(null);
+  const focusEvidence = useRef(false);
+  useEffect(() => {
+    if (evidence && focusEvidence.current) { focusEvidence.current = false; evidenceHeading.current?.focus(); }
+  }, [evidence]);
 
   const load = useCallback(() => {
     setTickets(null); setError(null);
@@ -46,12 +53,18 @@ function ApprovalQueue() {
   useEffect(load, [load]);
 
   const showEvidence = (id: string) => api<Evidence>(`/api/tickets/${encodeURIComponent(id)}/evidence`).then(setEvidence).catch((e) => setError(e.message));
-  const decide = async (id: string, decision: "approved" | "rejected") => {
+  const decide = async (id: string, title: string, decision: "approved" | "rejected") => {
+    if (savingId) return; // prevents double submit
+    setSavingId(id); setAnnounce("");
     try {
       await api(`/api/tickets/${encodeURIComponent(id)}/decision`, { method: "POST", body: JSON.stringify({ decision, role }) });
+      setAnnounce(`${title} ${decision === "approved" ? "approved" : "rejected"} by ${role}. Decision recorded in the audit log.`);
       load();
-      if (decision === "approved") await showEvidence(id);
-    } catch (e) { setError((e as Error).message); }
+      if (decision === "approved") { focusEvidence.current = true; await showEvidence(id); }
+    } catch (e) {
+      setError((e as Error).message);
+      setAnnounce(`Could not save the decision for ${title}. Try again.`);
+    } finally { setSavingId(null); }
   };
 
   return (
@@ -71,11 +84,12 @@ function ApprovalQueue() {
           </select>
         </label>
       </div>
+      <p className="llf-sr-only" aria-live="polite" role="status">{announce}</p>
       {error && <p role="alert" className="llf-error">{error}</p>}
       {tickets === null && !error && <p className="llf-state" aria-live="polite">Loading tickets...</p>}
       {tickets?.length === 0 && <p className="llf-state">No {status === "all" ? "" : status} tickets for {role}.</p>}
       {tickets && tickets.length > 0 && (
-        <div className="llf-card">
+        <div className="llf-card llf-table-wrap">
           <table>
             <caption className="llf-state" style={{ textAlign: "left", padding: 0 }}>{tickets.length} ticket(s)</caption>
             <thead><tr><th>Ticket</th><th>Circuit</th><th>Vendor</th><th className="num">Monthly cost</th><th className="num">Est. monthly savings</th><th>Agent</th><th>Status</th><th>Action</th></tr></thead>
@@ -86,14 +100,16 @@ function ApprovalQueue() {
                   <td>{t.circuit_id ?? "-"}</td><td>{t.vendor_id ?? "-"}</td>
                   <td className="num">{fmtUsd(t.monthly_cost)}</td><td className="num">{fmtUsd(t.est_monthly_savings)}</td>
                   <td>{t.agent_name}</td><td>{t.status}</td>
-                  <td style={{ display: "flex", gap: 8 }}>
-                    {t.status === "pending" ? (<>
-                      <button className="llf-btn llf-btn--approve" onClick={() => decide(t.ticket_id, "approved")} aria-label={`Approve ${t.title}`}>Approve</button>
-                      <button className="llf-btn llf-btn--reject" onClick={() => decide(t.ticket_id, "rejected")} aria-label={`Reject ${t.title}`}>Reject</button>
-                    </>) : (
-                      <button className="llf-btn" onClick={() => showEvidence(t.ticket_id)}>View evidence</button>
+                  <td><div className="llf-actions">
+                    {t.status === "pending" ? (savingId === t.ticket_id ? (
+                      <button className="llf-btn" disabled aria-disabled="true">Saving...</button>
+                    ) : (<>
+                      <button className="llf-btn llf-btn--approve" disabled={savingId !== null} onClick={() => decide(t.ticket_id, t.title, "approved")} aria-label={`Approve ${t.title}`}>Approve</button>
+                      <button className="llf-btn llf-btn--reject" disabled={savingId !== null} onClick={() => decide(t.ticket_id, t.title, "rejected")} aria-label={`Reject ${t.title}`}>Reject</button>
+                    </>)) : (
+                      <button className="llf-btn" onClick={() => { focusEvidence.current = true; showEvidence(t.ticket_id); }}>View evidence</button>
                     )}
-                  </td>
+                  </div></td>
                 </tr>
               ))}
             </tbody>
@@ -101,14 +117,14 @@ function ApprovalQueue() {
         </div>
       )}
       {evidence && (
-        <div className="llf-card" aria-labelledby="ev-h">
-          <h3 id="ev-h">Evidence for {evidence.ticket.ticket_id}</h3>
+        <section className="llf-card" aria-labelledby="ev-h">
+          <h3 id="ev-h" ref={evidenceHeading} tabIndex={-1}>Evidence for {evidence.ticket.ticket_id}</h3>
           <p><strong>Agent:</strong> {evidence.agentIdentity.name} | <strong>Service principal:</strong> {evidence.agentIdentity.servicePrincipal ?? "not recorded"} {evidence.agentIdentity.applicationId ? `(${evidence.agentIdentity.applicationId})` : ""}</p>
           <p><strong>MLflow trace:</strong> {evidence.traceUrl ? <a href={evidence.traceUrl} target="_blank" rel="noreferrer">Open trace {evidence.ticket.trace_id}</a> : "no trace recorded"}</p>
-          <table><thead><tr><th>When</th><th>Action</th><th>Actor</th><th>Role</th></tr></thead>
+          <div className="llf-table-wrap"><table><caption className="llf-sr-only">Audit record</caption><thead><tr><th>When</th><th>Action</th><th>Actor</th><th>Role</th></tr></thead>
             <tbody>{evidence.audit.map((a, i) => <tr key={i}><td>{new Date(a.at).toLocaleString()}</td><td>{a.action}</td><td>{a.actor}</td><td>{a.actor_role ?? "-"}</td></tr>)}</tbody>
-          </table>
-        </div>
+          </table></div>
+        </section>
       )}
     </section>
   );
@@ -133,7 +149,8 @@ function MarginExplorer({ metricView }: { metricView: string }) {
       {rows === null && !error && <p className="llf-state" aria-live="polite">Loading margin...</p>}
       {rows?.length === 0 && <p className="llf-state">No ledger rows yet.</p>}
       {rows && rows.length > 0 && (
-        <div className="llf-card"><table>
+        <div className="llf-card llf-table-wrap"><table>
+          <caption className="llf-sr-only">Margin by {DIMENSIONS.find(([k]) => k === dim)?.[1]}</caption>
           <thead><tr><th>{DIMENSIONS.find(([k]) => k === dim)?.[1]}</th><th className="num">Revenue</th><th className="num">Network Expense</th><th className="num">Cost to Serve</th><th className="num">Contribution Margin</th><th className="num">CM %</th><th className="num">Circuits</th></tr></thead>
           <tbody>{rows.map((r, i) => (
             <tr key={i}>
@@ -160,20 +177,40 @@ function MarginGenie({ cfg }: { cfg: Config }) {
 }
 
 const TABS = ["Approval queue", "Margin explorer", "Margin Genie"] as const;
+const tabId = (i: number) => `llf-tab-${i}`;
+const panelId = (i: number) => `llf-panel-${i}`;
 export default function App() {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Approval queue");
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const active = TABS.indexOf(tab);
+  const onTabKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    const last = TABS.length - 1;
+    const next = e.key === "ArrowRight" ? (active === last ? 0 : active + 1)
+      : e.key === "ArrowLeft" ? (active === 0 ? last : active - 1)
+      : e.key === "Home" ? 0 : e.key === "End" ? last : -1;
+    if (next < 0) return;
+    e.preventDefault();
+    setTab(TABS[next]);
+    tabRefs.current[next]?.focus();
+  };
   const [cfg, setCfg] = useState<Config>({ genieSpaceId: "", workspaceHost: "", mlflowExperimentId: "", metricView: "cdm_tmforum._metrics.margin_ledger_mv" });
   useEffect(() => { api<Config>("/api/config").then(setCfg).catch(() => undefined); }, []);
   return (
     <>
       <header className="llf-header"><span className="llf-mark" aria-hidden="true" /><h1>Lakelink Fiber | Margin Truth</h1></header>
       <nav className="llf-tabs" role="tablist" aria-label="Sections">
-        {TABS.map((t) => <button key={t} role="tab" className="llf-tab" aria-selected={tab === t} onClick={() => setTab(t)}>{t}</button>)}
+        {TABS.map((t, i) => (
+          <button key={t} ref={(el) => { tabRefs.current[i] = el; }} id={tabId(i)} role="tab" className="llf-tab"
+            aria-selected={tab === t} aria-controls={panelId(i)} tabIndex={tab === t ? 0 : -1}
+            onClick={() => setTab(t)} onKeyDown={onTabKey}>{t}</button>
+        ))}
       </nav>
-      <main role="tabpanel" aria-label={tab}>
-        {tab === "Approval queue" && <ApprovalQueue />}
-        {tab === "Margin explorer" && <MarginExplorer metricView={cfg.metricView} />}
-        {tab === "Margin Genie" && <MarginGenie cfg={cfg} />}
+      <main>
+        <div role="tabpanel" id={panelId(active)} aria-labelledby={tabId(active)} tabIndex={0} className="llf-panel">
+          {tab === "Approval queue" && <ApprovalQueue />}
+          {tab === "Margin explorer" && <MarginExplorer metricView={cfg.metricView} />}
+          {tab === "Margin Genie" && <MarginGenie cfg={cfg} />}
+        </div>
       </main>
     </>
   );

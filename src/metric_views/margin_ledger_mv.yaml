@@ -1,4 +1,4 @@
-# Lakelink Fiber Margin Truth - metric view DRAFT v0.1 (P2-MV-YAML-DRAFT, @data-analyst, 2026-11-12)
+# Lakelink Fiber Margin Truth - metric view DRAFT v0.2 (P2-MV-YAML-DRAFT + QA-MV-COUNT-FORMAT, @data-analyst, 2026-11-12)
 # Deploy target: cdm_tmforum._metrics.margin_ledger_mv  (DEC-001, DEC-002)
 # Built against src/semantics/STANDARDS.md v1.0 (commit f9b2f65). NOT DEPLOYED: waits on P1-LEDGER-GOLD-FASTPATH.
 # Deploy:  CREATE VIEW cdm_tmforum._metrics.margin_ledger_mv WITH METRICS LANGUAGE YAML AS $$ <this body> $$
@@ -83,7 +83,7 @@ dimensions:
   - name: vendor_id
     expr: vendor_id
     display_name: Vendor ID
-    comment: "Third-party carrier (MGN-VND-###) for off-net circuits; NULL when on-net."
+    comment: "Third-party carrier for off-net circuits (Salesforce partner_account Id from margin_vendors, DEC-003); NULL when on-net."
     synonyms: [carrier, supplier, provider]
   - name: allocation_rule_version
     expr: allocation_rule_version
@@ -184,9 +184,19 @@ measures:
     expr: COUNT(DISTINCT circuit_id)
     display_name: Circuits
     comment: "Number of distinct circuits."
+    format:
+      type: number
+      decimal_places: {type: exact, places: 0}
+      hide_group_separator: false
+      abbreviation: compact
     synonyms: [number of circuits, circuit count]
   - name: customer_count
     expr: COUNT(DISTINCT customer_id)
     display_name: Customers
     comment: "Number of distinct customers."
+    format:
+      type: number
+      decimal_places: {type: exact, places: 0}
+      hide_group_separator: false
+      abbreviation: compact
     synonyms: [number of customers, accounts]
