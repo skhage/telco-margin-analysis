@@ -6,7 +6,7 @@ Hard rules: the bundle deploys into EXISTING schemas only (`cdm_tmforum.revenue_
 
 ## 0. Preconditions (check every time)
 
-* P6-DAB-DEPLOY dependencies completed on the Lakebase board: P3-DASHBOARD, P3-APP-SCAFFOLD, P1-SDP-PIPELINE. Do NOT run steps 3-4 until all three are done.
+* P6-DAB-DEPLOY dependencies completed on the Lakebase board: P3-DASHBOARD, P1-SDP-PIPELINE (P3-APP-SCAFFOLD dropped by @pm 2026-11-13 run #6). Steps 3-4 additionally need CEO OK (see section 7).
 * `git status` is clean on `main`, and `HEAD` equals `origin/main`.
 * Variables (defaults in `databricks.yml`): `catalog=cdm_tmforum`, `schema=revenue_assurance`, `metrics_schema=_metrics`, `project_tag=margin_analysis`, `warehouse_id` = lookup of warehouse `telco_cdm_model`.
 
@@ -40,7 +40,7 @@ databricks bundle deployment bind margin_pipeline 20960984-a9d3-46f4-826a-630115
 databricks bundle validate --strict
 ```
 
-WARNING: the only target is `dev` (`mode: development`). Development mode prefixes names with `[dev <user>]` and pauses schedules. After a bind, a deploy RENAMES the live dashboard and pipeline and overwrites any UI edits made since the last commit. Before you bind, commit the latest dashboard JSON (`src/dashboards/Lakelink Fiber Margin Truth.lvdash.json`), and get CEO OK for the rename during rehearsal. If the CEO does not approve the rename, use step 5.
+WARNING: target `dev` (`mode: development`, the default target) is the only target that declares the live dashboard, app, and pipeline. Development mode prefixes names with `[dev <user>]` and pauses schedules. After a bind, a deploy RENAMES the live dashboard and pipeline and overwrites any UI edits made since the last commit. Before you bind, commit the latest dashboard JSON (`src/dashboards/Lakelink Fiber Margin Truth.lvdash.json`), and get CEO OK for the rename during rehearsal. If the CEO does not approve the rename, use step 5.
 
 ## 4. Full deploy (after step 3)
 
@@ -72,3 +72,31 @@ The synth generator and metric-view jobs run as a dry run by default. Running th
 
 * Bound resources: `databricks bundle deployment unbind <key>` keeps the live asset and removes bundle management.
 * Never run `bundle destroy` on a bound target: it would delete the ONE dashboard, app, and pipeline.
+
+## 7. Does a dev deploy create a SECOND app, dashboard, or pipeline? (COO-Q-20261113-31)
+
+Evidence from @devops, 2026-11-13. `bundle validate --strict` passes for both `-t dev` and `-t jobs_only`.
+
+(a) Resolved names from `databricks bundle summary` (state: nothing deployed):
+
+| Key | dev (mode development) | jobs_only |
+| --- | --- | --- |
+| margin_app | `lakelink-margin-truth` (apps get no prefix) | not declared |
+| margin_scorecard | `[dev stephen_hage] Lakelink Fiber Margin Truth` | not declared |
+| margin_pipeline | `[dev stephen_hage] Lakelink Fiber Margin Truth Pipeline` | not declared |
+| 4 jobs | `[dev stephen_hage] lakelink-margin-*` (schedules paused) | `lakelink-margin-functions`, `-metric-views`, `-stall-monitor`, `-synth-generator` |
+
+(b) Bind state: NOTHING is bound. Both targets show `URL: (not deployed)` for every key. The workspace state folders `~/.bundle/telco_margin_analysis/{dev,jobs_only}` contain no state files. No `lakelink-margin-*` jobs exist yet.
+
+If someone ran `bundle deploy -t dev` in THIS workspace today, the result would be:
+* Dashboard: a SECOND dashboard, `[dev stephen_hage] Lakelink Fiber Margin Truth`, created next to `01f1df1950c51bd68e87ace31632c2bf`. This breaks the cap.
+* Pipeline: a SECOND pipeline, `[dev stephen_hage] ... Pipeline`, created next to `20960984-...`. This breaks the cap.
+* App: same name as the live `lakelink-margin-truth` (apps get no dev prefix). Expected: the create conflicts with the existing app (not exercised; no deploy was run). Treat as unsafe.
+
+The dev target is therefore BLOCKED in this workspace unless step 3 (bind all three first) runs with CEO OK.
+
+(c) Command to run:
+* In THIS (demo) workspace: `databricks bundle deploy -t jobs_only`. It yields 4 jobs and 0 apps, dashboards, or pipelines. The ONE app, ONE dashboard, and ONE pipeline stay the live originals, so the count of each is exactly 1.
+* In the customer's FRESH dev workspace (leave-behind): from `bundle/`, run `databricks bundle validate --strict -t dev` and then `databricks bundle deploy -t dev`. With no pre-existing assets, this creates exactly 1 app, 1 dashboard, 1 pipeline, and 4 jobs, as shown in the summary table above. Genie is recreated from `../genie/margin_genie_instructions.md`, because it is not a bundle resource.
+
+(d) asset_ledger: nothing has been deployed, so there are no rows yet. Any future deploy logs one row per created job.
