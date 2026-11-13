@@ -15,6 +15,7 @@
 #   margin_metric_views.job.yml      deploys src/metric_views/*.yaml into ${var.metrics_schema} (dry run default)
 #   margin_synth_generator.job.yml   rebuilds margin_ synthetic tables + fast-path ledger (dry run default)
 #   margin_genie (Genie agent)       space 01f1df115a08164aab3ae5f6faac807c; config in ../genie (see README.md)
+# Deploy procedure (bind live assets first, jobs-only fallback): DEPLOY_RUNBOOK.md
 # Secrets and tokens are NEVER committed; use secret scopes or app resources.
 
 bundle:
@@ -32,6 +33,7 @@ sync:
     - ../tests
     - ../src
     - ../data
+    - ../pipeline
   # DEVOPS-EXCLUDE-PROJECTPLAN (QA-F-BRAND-PROJECTPLAN): resources/projectplan.md is a
   # CEO-supplied research reference that names a real company. It must NEVER ship in the
   # bundle or the app source. ../resources is intentionally not in sync.paths; this

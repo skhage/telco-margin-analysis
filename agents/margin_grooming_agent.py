@@ -26,6 +26,10 @@ DRY RUN (ML-GROOMING-DRYRUN-TOOLS, 2026-11-13):
   set -> real Genie Conversation API (genie_basis=margin_genie).
 * DRY_RUN=True: draft_savings_ticket runs every guard but writes NOTHING to the app queue (returns would_insert).
   Stand-in known answers: 47 candidates (DEC-017); MV total 2,375,095,705.09 (DEC-020).
+
+LIVE GENIE RUN (P4-GROOMING-AGENT, 2026-11-13): real Margin Genie returned total_row_count=47; trace
+tr-f09d04073ced6c20fad2e0100ad00eb2. DEDUP GUARD: draft_savings_ticket returns existing_ticket when a non-TEST pending
+offnet_grooming ticket already exists for the circuit, so re-runs never duplicate GROOM-44c3612b69 / GROOM-6d8f8ce31e.
 """
 import json, time, uuid
 import mlflow, psycopg
@@ -35,7 +39,7 @@ from databricks.sdk.service.sql import StatementParameterListItem
 
 STUB_MODE = False
 DRY_RUN = True  # True = validate tickets but never INSERT into the app approval queue
-MARGIN_GENIE_SPACE_ID = None  # ONE-LINE GENIE SWITCH: set to the P3-MARGIN-GENIE space id to use real Margin Genie
+MARGIN_GENIE_SPACE_ID = "01f1df115a08164aab3ae5f6faac807c"  # Lakelink Fiber Margin Genie (P3-MARGIN-GENIE); None -> sql_standin
 WAREHOUSE_ID = "bf0baa637e887c80"
 _last_basis = {}
 
@@ -100,6 +104,14 @@ STUB_CIRCUITS = {45040: {"vendor_id": "00100000000265pAAA", "is_parallel_to_onne
                          "onnet_distance_m": 51.0, "bandwidth_mbps": 1000.0, "paid_amount_usd": 2400.00}}
 
 
+def existing_pending(cid):
+    """Dedup guard: non-TEST pending grooming tickets already in the app queue for this circuit."""
+    with app_conn() as c, c.cursor() as cur:
+        cur.execute("SELECT ticket_id FROM public.approval_tickets WHERE circuit_id=%s AND ticket_type='offnet_grooming' "
+                    "AND status='pending' AND ticket_id NOT LIKE 'TEST-%%'", (str(cid),))
+        return [r[0] for r in cur.fetchall()]
+
+
 def _stub_score(c):  # same formula as agents/margin_score_onnet_move.sql
     sav = round(c["paid_amount_usd"] - (2.00 * c["bandwidth_mbps"] + 0.50 * c["onnet_distance_m"] / 36), 2)
     sc = int(min(100, max(0, (50 if c["is_parallel_to_onnet_fiber"] else 0)
@@ -149,7 +161,11 @@ def ask_margin_genie(question):
                 "note": "Margin Genie space not yet available; answered with margin_score_onnet_move + MEASURE(contribution_margin) from margin_ledger_mv (top 10 of the DEC-017 candidates).",
                 "rows": run_sql(GENIE_STANDIN_SQL)}
     _last_basis["genie_basis"] = "margin_genie"
-    return genie_ask(question)
+    out = genie_ask(question)
+    mlflow.get_current_active_span().set_attributes({
+        "genie_conversation_id": out["conversation_id"], "genie_message_id": out["message_id"],
+        "genie_total_row_count": str(out.get("total_row_count")), "genie_sql": out.get("sql") or ""})
+    return out
 
 
 def genie_ask(question, timeout_s=120):
@@ -172,6 +188,7 @@ def genie_ask(question, timeout_s=120):
             res = w.api_client.do("GET", f"{base}/conversations/{cid}/messages/{mid}/attachments/{att['attachment_id']}/query-result")
             sr = res.get("statement_response", {})
             cols = [c["name"] for c in sr.get("manifest", {}).get("schema", {}).get("columns", [])]
+            out["total_row_count"] = sr.get("manifest", {}).get("total_row_count")
             out["rows"] = [dict(zip(cols, r)) for r in (sr.get("result", {}).get("data_array") or [])[:20]]
     return out
 
@@ -218,6 +235,12 @@ def draft_savings_ticket(circuit_id, vendor_id, monthly_cost, est_monthly_saving
             return {"error": "values do not match score_onnet_move or savings <= 0; ticket not drafted"}
         extra = {"identity_mode": "sp" if AGENT_SP_APP_ID else "user_fallback", "score_basis": chk[0]["score_basis"],
                  "genie_basis": _last_basis.get("genie_basis", "margin_genie"), "score": int(chk[0]["score"])}
+    if not STUB_MODE:
+        ex = existing_pending(circuit_id)
+        if ex:  # never duplicate a pending ticket for the same circuit
+            mlflow.get_current_active_span().set_attribute("dedup_existing_ticket", ex[0])
+            return {"existing_ticket": ex[0], "status": "pending",
+                    "note": "pending ticket already exists for this circuit; not re-inserted", **extra}
     if DRY_RUN:  # all guards passed; never write to the app queue in a dry run
         mlflow.get_current_active_span().set_attribute("dry_run", True)
         return {"dry_run": True, "would_insert": {"ticket_id": tid, "circuit_id": int(circuit_id), "vendor_id": vendor_id,
@@ -251,7 +274,10 @@ def gateway_chat(messages):
 def run_agent(task, max_turns=8):
     mlflow.update_current_trace(tags={"telco_project": "margin_analysis", "company": "Lakelink Fiber",
                                       "stub_run": str(STUB_MODE).lower(), "dry_run": str(DRY_RUN).lower(),
-                                      "genie_mode": "margin_genie" if MARGIN_GENIE_SPACE_ID else "sql_standin"})
+                                      "genie_mode": "margin_genie" if MARGIN_GENIE_SPACE_ID else "sql_standin",
+                                      "genie_space_id": str(MARGIN_GENIE_SPACE_ID),
+                                      "identity_mode": "sp" if AGENT_SP_APP_ID else "user_fallback",
+                                      "run_as": w.current_user.me().user_name, "gateway_service": GATEWAY_SERVICE})
     messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": task}]
     calls = []
     for _ in range(max_turns):

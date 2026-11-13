@@ -58,12 +58,16 @@ FROM parsed;
 -- Expectations:
 --   pk_not_null: composite PK columns must be non-null (FAIL)
 --   no_carrier_overcharge: carrier_rate_variance_usd <= 0 (WARN: planted story, ~4500 rows)
---   positive_revenue: revenue_usd > 0 (DROP null/zero revenue rows)
+--   billed_revenue_present: revenue_usd > 0 (WARN only: planted revenue-leakage story, 1,439 zero-billed rows).
+--     Was ON VIOLATION DROP ROW until 2026-11-13; dropping removed -5,239,443.24 CM and broke tie-out to
+--     the fast-path ledger (COO-Q-20261113-8). Rows must be KEPT so v2 = margin_ledger to 0.00 (DEC-020/023).
+--   revenue_not_null: revenue_usd IS NOT NULL (WARN)
 -- ============================================================
 CREATE OR REFRESH MATERIALIZED VIEW margin_ledger_v2 (
   CONSTRAINT pk_not_null EXPECT (ledger_month IS NOT NULL AND customer_id IS NOT NULL AND product_id IS NOT NULL AND circuit_id IS NOT NULL) ON VIOLATION FAIL UPDATE,
   CONSTRAINT no_carrier_overcharge EXPECT (carrier_rate_variance_usd <= 0),
-  CONSTRAINT positive_revenue EXPECT (revenue_usd > 0) ON VIOLATION DROP ROW
+  CONSTRAINT billed_revenue_present EXPECT (revenue_usd > 0),
+  CONSTRAINT revenue_not_null EXPECT (revenue_usd IS NOT NULL)
 )
 COMMENT 'Lakelink Fiber margin ledger (gold, pipeline build). Same schema and logic as fast-path margin_ledger (DEC-008). Rename to margin_ledger after dropping the fast-path table. Grain: customer x product x circuit x month. Source: margin_billing, margin_carrier_invoices, margin_contracts, margin_circuits, margin_products, margin_customers, margin_gl_actuals, margin_allocation_rules.'
 TBLPROPERTIES ('telco_project' = 'margin_analysis')

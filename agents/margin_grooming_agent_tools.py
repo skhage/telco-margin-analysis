@@ -22,7 +22,7 @@ GATEWAY_SERVICE = f"{CATALOG}.{SCHEMA}.margin_grooming_agent_llm"
 SCORE_FUNCTION = f"{CATALOG}.{SCHEMA}.margin_score_onnet_move"
 CM_METRIC_VIEW = f"{CATALOG}._metrics.margin_ledger_mv"
 MLFLOW_EXPERIMENT_ID = "1235449331932066"
-MARGIN_GENIE_SPACE_ID = None  # set when @data-analyst creates the ONE Margin Genie (P3-MARGIN-GENIE)
+MARGIN_GENIE_SPACE_ID = "01f1df115a08164aab3ae5f6faac807c"  # Lakelink Fiber Margin Genie (P3-MARGIN-GENIE)
 APPROVAL_DB_HOST = "ep-calm-king-d2mq878u.database.us-east-1.cloud.databricks.com"  # Lakebase project telco-margin-analysis-app
 
 SYSTEM_PROMPT = """You are the Lakelink Fiber off-net grooming agent.
@@ -36,7 +36,8 @@ Rules:
    and est_monthly_savings_usd > 0. Copy circuit_id, vendor_id, monthly_offnet_cost_usd and
    est_monthly_savings_usd exactly as returned.
 4. Tickets are drafts. A person in Ops approves them in the Margin Truth app. Never mark a ticket approved.
-5. Use the company name Lakelink Fiber only."""
+5. Use the company name Lakelink Fiber only.
+6. If draft_savings_ticket returns dry_run=true or existing_ticket, say so plainly; do not claim a new ticket was created."""
 
 # OpenAI-style function tool specs passed to the Unity Gateway chat/completions call.
 TOOLS = [
