@@ -18,8 +18,9 @@ const auditDetail = (d: Record<string, unknown> | null): ReactNode => {
   if (!d) return <NotAvailable />;
   const parts: string[] = [];
   if (typeof d.comment === "string" && d.comment) parts.push(`Comment: ${d.comment}`);
-  if (d.identity_mode === "user_fallback") parts.push("Ran as user identity (fallback)");
-  if (typeof d.run_as === "string") parts.push(`Run as ${d.run_as}`);
+  // DSN-TRACE-PANEL-R1 item 2: one identity phrase, matching the evidence panel wording
+  if (d.identity_mode === "user_fallback") parts.push(typeof d.run_as === "string" && d.run_as ? `User identity (fallback): ran as ${d.run_as}` : "User identity (fallback)");
+  else if (typeof d.run_as === "string" && d.run_as) parts.push(`Ran as ${d.run_as}`);
   if (d.score != null) parts.push(`On-net score ${String(d.score)}`);
   return parts.length ? parts.join("; ") : <NotAvailable />;
 };
@@ -43,6 +44,15 @@ const StatusBadge = ({ status }: { status: string }) => (
   <span className={`llf-badge llf-badge--${status.toLowerCase()}`}>{sentence(status)}</span>
 );
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+// DSN-TRACE-PANEL-R1 item 3: evidence timestamps always show the time zone
+const DATE_FMT: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short", timeZoneName: "short" };
+const fmtWhen = (v: string) => new Date(v).toLocaleString(undefined, DATE_FMT);
+// DSN-TRACE-PANEL-R1 item 5: Lucide ExternalLink (16px, 1.5px stroke), inlined so no new dependency
+const ExternalLinkIcon = () => (
+  <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: "-3px", marginLeft: 4 }}>
+    <path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+  </svg>
+);
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, { ...init, headers: { "Content-Type": "application/json" } });
@@ -70,7 +80,7 @@ function ApprovalQueue() {
   // DSN-APP-QUEUE-LIVE-R1: loading state is announced through the single persistent role=status region (designer note 247).
   // announceLoad=false after a decision so the decision announcement is not overwritten.
   const load = useCallback((announceLoad: boolean = true) => {
-    setTickets(null); setError(null);
+    setTickets(null); setError(null); setEvidence(null); // DSN-TRACE-PANEL-R1 item 4: never show a stale panel
     if (announceLoad) setAnnounce("Loading tickets...");
     api<Ticket[]>(`/api/tickets?role=${encodeURIComponent(role)}&status=${status}`)
       .then((rows) => { setTickets(rows); if (announceLoad) setAnnounce(`${plural(rows.length, "ticket", "tickets")} loaded.`); })
@@ -78,7 +88,7 @@ function ApprovalQueue() {
   }, [role, status]);
   useEffect(() => { load(); }, [load]);
 
-  const showEvidence = (id: string) => api<Evidence>(`/api/tickets/${encodeURIComponent(id)}/evidence`).then(setEvidence).catch((e) => setError(`Evidence could not be loaded. Try again in a moment. (${e.message})`));
+  const showEvidence = (id: string) => { setEvidence(null); return api<Evidence>(`/api/tickets/${encodeURIComponent(id)}/evidence`).then(setEvidence).catch((e) => setError(`Evidence could not be loaded. Try again in a moment. (${e.message})`)); };
   const decide = async (id: string, title: string, decision: "approved" | "rejected") => {
     if (savingId) return; // prevents double submit
     setSavingId(id); setAnnounce("");
@@ -123,7 +133,7 @@ function ApprovalQueue() {
             <tbody>
               {tickets.map((t) => (
                 <tr key={t.ticket_id}>
-                  <td><strong>{t.title}</strong><br /><small>{t.ticket_id}</small>
+                  <td><strong>{t.title}</strong><br /><small className="llf-muted">{t.ticket_id}</small>
                     {t.rationale && <p className="llf-rationale">{t.rationale}</p>}</td>
                   <td>{orNA(t.circuit_id)}</td>
                   <td>{t.vendor_name ? <>{t.vendor_name}<br /><small className="llf-muted">{t.vendor_id}</small></> : orNA(t.vendor_id)}</td>
@@ -134,13 +144,13 @@ function ApprovalQueue() {
                       <button className="llf-btn" disabled aria-disabled="true">Saving...</button>
                     ) : (<>
                       <label className="llf-comment">Comment (optional)
-                        <input type="text" maxLength={2000} value={comments[t.ticket_id] ?? ""} disabled={savingId !== null}
+                        <input type="text" maxLength={2000} aria-label={`Comment (optional) for ${t.title}`} value={comments[t.ticket_id] ?? ""} disabled={savingId !== null}
                           onChange={(e) => { const v = e.target.value; setComments((c) => ({ ...c, [t.ticket_id]: v })); }} />
                       </label>
                       <button className="llf-btn llf-btn--approve" disabled={savingId !== null} onClick={() => decide(t.ticket_id, t.title, "approved")} aria-label={`Approve ${t.title}`}>Approve</button>
                       <button className="llf-btn llf-btn--reject" disabled={savingId !== null} onClick={() => decide(t.ticket_id, t.title, "rejected")} aria-label={`Reject ${t.title}`}>Reject</button>
                     </>)) : (
-                      <button className="llf-btn" onClick={() => { focusEvidence.current = true; showEvidence(t.ticket_id); }}>View evidence</button>
+                      <button className="llf-btn" aria-label={`View evidence for ${t.title}`} onClick={() => { focusEvidence.current = true; showEvidence(t.ticket_id); }}>View evidence</button>
                     )}
                   </div></td>
                 </tr>
@@ -154,21 +164,21 @@ function ApprovalQueue() {
           <h3 id="ev-h" ref={evidenceHeading} tabIndex={-1}>Evidence for {evidence.ticket.ticket_id}</h3>
           <dl className="llf-evidence">
             <dt>Agent</dt><dd>{evidence.agentIdentity.name}</dd>
-            <dt>Service principal</dt>
+            <dt>Agent identity</dt>
             <dd>{evidence.agentIdentity.identityMode === "service_principal"
               ? <>{orNA(evidence.agentIdentity.servicePrincipal)}{evidence.agentIdentity.applicationId ? ` (application ID ${evidence.agentIdentity.applicationId})` : ""}</>
               : <>User identity (fallback){evidence.agentIdentity.runAs ? `: ran as ${evidence.agentIdentity.runAs}` : ""}</>}</dd>
             <dt>MLflow trace</dt>
             <dd>{evidence.traceId
               ? (evidence.traceUrl
-                ? <a href={evidence.traceUrl} target="_blank" rel="noreferrer">Open trace {evidence.traceId}<span className="llf-sr-only"> (opens in a new tab)</span></a>
+                ? <a href={evidence.traceUrl} target="_blank" rel="noreferrer">Open trace {evidence.traceId}<ExternalLinkIcon /><span className="llf-sr-only"> (opens in a new tab)</span></a>
                 : evidence.traceId)
               : "No trace recorded"}</dd>
             <dt>MLflow experiment</dt><dd>{orNA(evidence.experimentId)}</dd>
-            <dt>Decision</dt><dd><StatusBadge status={evidence.ticket.status} />{evidence.ticket.decided_by ? ` by ${evidence.ticket.decided_by}` : ""}{evidence.ticket.decided_at ? ` on ${new Date(evidence.ticket.decided_at).toLocaleString()}` : ""}</dd>
+            <dt>Decision</dt><dd><StatusBadge status={evidence.ticket.status} />{evidence.ticket.decided_by ? ` by ${evidence.ticket.decided_by}` : ""}{evidence.ticket.decided_at ? ` on ${fmtWhen(evidence.ticket.decided_at)}` : ""}</dd>
           </dl>
           <div className="llf-table-wrap"><table><caption className="llf-caption">Audit record ({plural(evidence.audit.length, "entry", "entries")})</caption><thead><tr><th>When</th><th>Action</th><th>Actor</th><th>Role</th><th>Details</th></tr></thead>
-            <tbody>{evidence.audit.map((a, i) => <tr key={i}><td>{new Date(a.at).toLocaleString()}</td><td>{sentence(a.action)}</td><td>{a.actor}</td><td>{orNA(a.actor_role)}</td><td>{auditDetail(a.details)}</td></tr>)}</tbody>
+            <tbody>{evidence.audit.map((a, i) => <tr key={i}><td>{fmtWhen(a.at)}</td><td>{sentence(a.action)}</td><td>{a.actor}</td><td>{orNA(a.actor_role)}</td><td>{auditDetail(a.details)}</td></tr>)}</tbody>
           </table></div>
         </section>
       )}

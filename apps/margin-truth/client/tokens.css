@@ -74,4 +74,7 @@ body, main { overflow-wrap: anywhere; }
   .llf-tabs { overflow-x: auto; padding: 0 var(--llf-space-2); }
   .llf-table-wrap th:first-child, .llf-table-wrap td:first-child { position: sticky; left: 0; background: var(--llf-card); z-index: 1; }
   .llf-table-wrap table { min-width: 640px; }
+  /* DSN-SCENE5-R2 F1: cap the frozen column so >= 50% of a 320px viewport stays for scrolling columns (WCAG 1.4.10) */
+  .llf-table-wrap th:first-child, .llf-table-wrap td:first-child { max-width: 45vw; }
+  .llf-rationale { max-width: none; }
 }
