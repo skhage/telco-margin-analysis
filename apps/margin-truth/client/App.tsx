@@ -139,7 +139,9 @@ function ApprovalQueue() {
   );
 }
 
-function MarginExplorer({ metricView }: { metricView: string }) {
+// DSN-APP-EXPLORER-PENDING-R1: one persistent live region, Genie-aware pending copy, select disabled while pending
+const PENDING_MSG_ID = "llf-explorer-pending";
+function MarginExplorer({ metricView, genieSpaceId }: { metricView: string; genieSpaceId: string }) {
   const [dim, setDim] = useState("product_family");
   const [rows, setRows] = useState<ExplorerRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -149,16 +151,26 @@ function MarginExplorer({ metricView }: { metricView: string }) {
     api<{ rows: ExplorerRow[] }>(`/api/explorer?dim=${dim}`).then((r) => setRows(r.rows))
       .catch((e) => (e.message === "pending_mv" ? setPending(true) : setError(e.message)));
   }, [dim]);
+  const dimLabel = DIMENSIONS.find(([k]) => k === dim)?.[1] ?? dim;
+  const pendingMsg = genieSpaceId
+    ? "The margin explorer goes live when the governed metric view is published. Until then, ask in Margin Genie."
+    : "The margin explorer goes live when the governed metric view is published.";
+  const liveText = pending ? pendingMsg
+    : error ? ""
+    : rows === null ? "Loading margin"
+    : `Margin by ${dimLabel} loaded, ${plural(rows.length, "row", "rows")}`;
   return (
     <section aria-labelledby="exp-h">
       <h2 id="exp-h">Margin explorer</h2>
       <p>Contribution margin comes from the governed metric view <code>{metricView}</code>. This app never recalculates it.</p>
       <div className="llf-card"><label>Break down by{" "}
-        <select value={dim} onChange={(e) => setDim(e.target.value)}>{DIMENSIONS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+        <select value={dim} onChange={(e) => setDim(e.target.value)} disabled={pending}
+          aria-describedby={pending ? PENDING_MSG_ID : undefined}>{DIMENSIONS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
       </label></div>
-      {pending && <p className="llf-state" role="status">The margin explorer goes live when the governed metric view is published. Until then, ask in Margin Genie.</p>}
+      <p className="llf-sr-only" role="status" aria-live="polite">{liveText}</p>
+      {pending && <p id={PENDING_MSG_ID} className="llf-state">{pendingMsg}</p>}
       {error && <p role="alert" className="llf-error">Metric view unavailable. Try again or ask in Margin Genie. <small>({error})</small></p>}
-      {rows === null && !error && !pending && <p className="llf-state" aria-live="polite">Loading margin...</p>}
+      {rows === null && !error && !pending && <p className="llf-state">Loading margin...</p>}
       {rows?.length === 0 && <p className="llf-state">No ledger rows yet.</p>}
       {rows && rows.length > 0 && (
         <div className="llf-card llf-table-wrap"><table>
@@ -220,7 +232,7 @@ export default function App() {
       <main>
         <div role="tabpanel" id={panelId(active)} aria-labelledby={tabId(active)} tabIndex={0} className="llf-panel">
           {tab === "Approval queue" && <ApprovalQueue />}
-          {tab === "Margin explorer" && <MarginExplorer metricView={cfg.metricView} />}
+          {tab === "Margin explorer" && <MarginExplorer metricView={cfg.metricView} genieSpaceId={cfg.genieSpaceId} />}
           {tab === "Margin Genie" && <MarginGenie cfg={cfg} />}
         </div>
       </main>

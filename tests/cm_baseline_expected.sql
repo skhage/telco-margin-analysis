@@ -48,7 +48,13 @@ FROM cdm_tmforum.revenue_assurance.margin_gl_actuals
 WHERE period_month BETWEEN DATE'2025-11-01' AND DATE'2026-10-01'
 GROUP BY account_class;
 
--- (4) Ops starter question (hero set, note 206 definition): expected 12 circuits
+-- (4a) Ops starter question, CANONICAL (DEC-017): off-net AND parallel AND savings > 0. Expected 47 (verified @qa 2026-11-13; featured 45040 = 879.34, 98532 = 469.00)
+SELECT COUNT(DISTINCT s.circuit_id) AS hero_circuits
+FROM cdm_tmforum.revenue_assurance.margin_score_onnet_move(NULL) s
+JOIN cdm_tmforum.revenue_assurance.margin_circuits c USING (circuit_id)
+WHERE NOT c.is_on_net AND s.is_parallel_to_onnet_fiber AND s.est_monthly_savings_usd > 0;
+
+-- (4b) Ops band sub-view only (note 206 definition, not the benchmark answer): expected 12 circuits
 SELECT COUNT(*) AS hero_circuits
 FROM cdm_tmforum.revenue_assurance.margin_circuits
 WHERE NOT is_on_net AND is_parallel_to_onnet_fiber AND bandwidth_mbps = 1000
@@ -66,5 +72,15 @@ SELECT segment, cm / rev AS cm_pct, rev / trev AS revenue_share, cust / tcust AS
 FROM s CROSS JOIN t
 WHERE cm / rev > tcm / trev AND rev / trev < cust / tcust;
 
--- (6) Sales starter question (renewals next 90 days below margin floor): PENDING canonical definition
---     (QA-LEDGER-STORY-COUNTS: 180 by Discount__c>=30 vs 598 by ledger CM% < margin_floor_pct). Not yet a regression gate.
+-- (6) Sales starter question (DEC-017): contracts with term_end in [as_of, as_of + 90d] AND contract CM% (full ledger range) < margin_floor_pct.
+--     PENDING the demo as-of date, which DEC-017 does not pin (QA-F-SALES-ASOF-DATE). @qa 2026-11-13 results:
+--     as_of 2026-11-13: 1,506 renewals, 1,392 with ledger rows, 603 below floor; as_of 2026-11-19: 1,490 / 1,377 / 586. The board's 598 / 1,381 is neither.
+--     Before the MV exists this uses raw SQL; switch to MEASURE() on margin_ledger_mv once deployed.
+WITH r AS (SELECT c.contract_id, p.margin_floor_pct
+           FROM cdm_tmforum.revenue_assurance.margin_contracts c JOIN cdm_tmforum.revenue_assurance.margin_products p USING (product_id)
+           WHERE c.term_end BETWEEN DATE'2026-11-19' AND date_add(DATE'2026-11-19', 90)),
+m AS (SELECT contract_id, SUM(revenue_usd - network_expense_usd - cost_to_serve_usd) / NULLIF(SUM(revenue_usd), 0) AS cm_pct
+      FROM cdm_tmforum.revenue_assurance.margin_ledger GROUP BY contract_id)
+SELECT COUNT(*) AS renewals, COUNT(m.contract_id) AS with_ledger,
+       SUM(CASE WHEN m.cm_pct < r.margin_floor_pct THEN 1 ELSE 0 END) AS below_floor
+FROM r LEFT JOIN m USING (contract_id);

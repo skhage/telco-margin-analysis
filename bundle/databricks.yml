@@ -28,6 +28,13 @@ sync:
     - ../apps/margin-truth
     - ../agents
     - ../tests
+  # DEVOPS-EXCLUDE-PROJECTPLAN (QA-F-BRAND-PROJECTPLAN): resources/projectplan.md is a
+  # CEO-supplied research reference that names a real company. It must NEVER ship in the
+  # bundle or the app source. ../resources is intentionally not in sync.paths; this
+  # exclude is a second guard in case a broader path (e.g. ..) is added later.
+  # (A "**/projectplan.md" glob fails validate --strict because it matches nothing.)
+  exclude:
+    - "../resources/projectplan.md"
 
 variables:
   catalog:

@@ -34,15 +34,22 @@ EXPECTED_TOTAL = Decimal("2375095704.83")
 # Persona starter questions (expected answers from raw SQL; see cm_baseline_expected.sql)
 EXPECTED_PERSONA = {
     "finance_q3_2026_losers": ["IP-VPN", "Legacy Voice"],
-    "ops_hero_circuit_count": 12,
+    "ops_hero_circuit_count": 47,  # DEC-017: off-net AND parallel AND margin_score_onnet_move savings > 0 (featured 45040, 98532)
+    "ops_hero_band_subview": 12,    # @qa band filter (note 206), sub-view only
     "marketing_room_to_grow": ["Commercial"],
-    "sales_below_floor_renewals": None,  # PENDING QA-LEDGER-STORY-COUNTS
+    "sales_below_floor_renewals": None,  # PENDING demo as-of date (DEC-017 does not pin it): @qa 2026-11-13 got 603 @ as-of 2026-11-13, 586 @ 2026-11-19
 }
 
 GENIE_ONE_MANUAL = {}  # fill by hand during rehearsal
 
 MV_SQL = ("SELECT product_family, CAST(MEASURE(contribution_margin) AS DECIMAL(18,2)) AS cm "
           "FROM cdm_tmforum._metrics.margin_ledger_mv GROUP BY ALL")
+# Live-allocation view (DA-DE-LIVE-ALLOCATION-VIEW). Per-row ROUND(...,2) => +0.26 vs table total; tolerance $1 total, $10 per cell (note 280).
+ALLOC_SQL = ("SELECT product_family, CAST(SUM(revenue_usd - network_expense_usd - cost_to_serve_usd) AS DECIMAL(18,2)) AS cm "
+             "FROM cdm_tmforum.revenue_assurance.margin_ledger_allocated GROUP BY product_family")
+EXPECTED_ALLOC_TOTAL = Decimal("2375095705.09")
+ALLOC_TOL_CELL = Decimal("10.00")
+ALLOC_TOL_TOTAL = Decimal("1.00")
 REF_SQL = ("SELECT product_family, CAST(SUM(revenue_usd - network_expense_usd - cost_to_serve_usd) AS DECIMAL(18,2)) AS cm "
            "FROM cdm_tmforum.revenue_assurance.margin_ledger GROUP BY product_family")
 
@@ -82,6 +89,7 @@ def run(spark):
     results = {
         "reference_raw_sql": compare("ref", sql_surface(spark, REF_SQL)),
         "metric_view": compare("mv", sql_surface(spark, MV_SQL)),
+        "ledger_allocated": compare("alloc", sql_surface(spark, ALLOC_SQL), tol=ALLOC_TOL_CELL),
         "genie": compare("genie", None),       # wire after P3-MARGIN-GENIE
         "genie_one": compare("genie_one", GENIE_ONE_MANUAL or None),
         "dashboard": compare("dashboard", None),  # wire after P3-DASHBOARD
@@ -90,6 +98,10 @@ def run(spark):
     }
     total = sum(EXPECTED_FULL.values())
     assert total == EXPECTED_TOTAL, total
+    alloc = sql_surface(spark, ALLOC_SQL)
+    if alloc is not None:
+        at = sum(alloc.values())
+        results["ledger_allocated_total"] = ("PASS" if abs(at - EXPECTED_ALLOC_TOTAL) <= ALLOC_TOL_TOTAL else "MISMATCH", [("__TOTAL__", EXPECTED_ALLOC_TOTAL, at)])
     return results
 
 
