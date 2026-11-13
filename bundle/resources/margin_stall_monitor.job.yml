@@ -1,0 +1,32 @@
+# Lakelink Fiber - Margin Truth: live swarm stall monitor (COO-Q-20261112-22, owner @devops).
+# Runs ../../tests/stall_monitor.py (wraps tests/stall_detector.sql) hourly at :20 on serverless,
+# independent of the Genie Code scheduler. >=6 roles silent >3h -> status_updates 'stall_alert'
+# row + failed run -> on_failure email. No secrets: Lakebase token minted at run time.
+# NOTE: `mode: development` pauses schedules on deploy; unpause the job once after deploy
+# (or deploy a non-development target) for it to fire.
+resources:
+  jobs:
+    margin_stall_monitor_job:
+      name: lakelink-margin-stall-monitor
+      description: Hourly Lakelink Fiber Margin Truth swarm stall detector over the Lakebase task board (telco_project=margin_analysis)
+      max_concurrent_runs: 1
+      timeout_seconds: 900
+      schedule:
+        quartz_cron_expression: "0 20 * * * ?"
+        timezone_id: UTC
+        pause_status: UNPAUSED
+      email_notifications:
+        on_failure:
+          - stephen.hage@databricks.com
+      environments:
+        - environment_key: stall_env
+          spec:
+            environment_version: "3"
+            dependencies:
+              - databricks-sdk>=0.60.0
+              - psycopg[binary]
+      tasks:
+        - task_key: stall_detector
+          environment_key: stall_env
+          spark_python_task:
+            python_file: ../../tests/stall_monitor.py

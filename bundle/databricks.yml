@@ -11,6 +11,7 @@
 #   margin_functions.job.yml         job that (re)creates margin_ UC functions
 #   margin_scorecard.dashboard.yml   ONE AI/BI dashboard (CFO scorecard + $1B Wall)
 #   margin_app.app.yml               ONE Databricks App (approval queue + margin explorer)
+#   margin_stall_monitor.job.yml     hourly swarm stall monitor over the Lakebase task board
 #   margin_genie (Genie agent)       exported space config, deployed by job/script (see README.md)
 # Secrets and tokens are NEVER committed; use secret scopes or app resources.
 
@@ -26,6 +27,7 @@ sync:
     - .
     - ../apps/margin-truth
     - ../agents
+    - ../tests
 
 variables:
   catalog:

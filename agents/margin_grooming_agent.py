@@ -8,13 +8,48 @@ Tracing: MLflow experiment 1235449331932066. Approval queue: Lakebase telco-marg
 STUB MODE: ask_margin_genie and score_onnet_move return stubbed values until P3-MARGIN-GENIE and
 P4-UC-FN-ONNET-SCORE land; swap in real tools for P4-GROOMING-AGENT. Stub tickets use ticket_id TEST-GROOM-* and
 rationale prefixed TEST.
+
+FALLBACK PATH (ML-GROOMING-FALLBACK-PATH, 2026-11-13) - used when STUB_MODE=False:
+* Identity: runs as the calling USER until SP lakelink-margin-grooming-agent exists (payload identity_mode=user_fallback).
+* Genie: if MARGIN_GENIE_SPACE_ID is None, ask_margin_genie answers from GENIE_FALLBACK_SQL
+  (margin_circuits + margin_vendors + margin_carrier_invoices; no margin figures), payload genie_basis=sql_fallback.
+* Scoring: real UC function margin_score_onnet_move (score_basis=carrier_invoice); if it errors or returns no rows
+  (e.g. margin_carrier_invoices absent), PROXY_SQL rate card by bandwidth tier (score_basis=proxy).
+  Proxy rate card = median latest paid_amount_usd per bandwidth tier from margin_carrier_invoices, frozen 2026-11-13.
+  CAUTION: proxy savings for hero circuits 45040/98532 are about -714 USD, so proxy never drafts hero tickets.
+* draft_savings_ticket re-checks values against score_onnet_move and refuses savings <= 0.
+Known answers (carrier_invoice basis): 45040 cost 2880.05 savings 879.34 score 65; 98532 cost 2469.86 savings 469.00 score 59.
 """
-import json, uuid
+import json, time, uuid
 import mlflow, psycopg
 from mlflow.entities import SpanType
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.sql import StatementParameterListItem
 
-STUB_MODE = True
+STUB_MODE = False
+MARGIN_GENIE_SPACE_ID = None  # set when P3-MARGIN-GENIE lands
+WAREHOUSE_ID = "bf0baa637e887c80"
+_last_basis = {}
+
+GENIE_FALLBACK_SQL = """
+WITH latest AS (SELECT circuit_id, paid_amount_usd, ROW_NUMBER() OVER (PARTITION BY circuit_id ORDER BY invoice_month DESC) rn
+                FROM cdm_tmforum.revenue_assurance.margin_carrier_invoices)
+SELECT c.circuit_id, v.vendor_name, c.vendor_id, c.onnet_distance_m, c.bandwidth_mbps, l.paid_amount_usd AS latest_monthly_paid_usd
+FROM cdm_tmforum.revenue_assurance.margin_circuits c
+JOIN cdm_tmforum.revenue_assurance.margin_vendors v ON v.vendor_id = c.vendor_id
+LEFT JOIN latest l ON l.circuit_id = c.circuit_id AND l.rn = 1
+WHERE c.is_on_net = FALSE AND c.is_parallel_to_onnet_fiber AND c.circuit_id IN (45040, 98532)
+ORDER BY l.paid_amount_usd DESC NULLS LAST"""
+
+PROXY_SQL = """
+SELECT c.circuit_id, c.vendor_id, c.is_parallel_to_onnet_fiber, c.onnet_distance_m,
+       CAST(rc.proxy_cost AS DECIMAL(18,2)) AS monthly_offnet_cost_usd,
+       CAST(rc.proxy_cost - (2.00*COALESCE(c.bandwidth_mbps,0) + 0.50*COALESCE(c.onnet_distance_m,0)/36) AS DECIMAL(18,2)) AS est_monthly_savings_usd
+FROM cdm_tmforum.revenue_assurance.margin_circuits c
+JOIN cdm_tmforum.revenue_assurance.margin_vendors v ON v.vendor_id = c.vendor_id
+JOIN (VALUES (0.06,1364.58),(1.54,909.72),(100.00,1187.69),(500.00,492.01),(1000.00,1286.96),(10000.00,5614.77),(100000.00,20383.93)) AS rc(bw, proxy_cost)
+  ON rc.bw = c.bandwidth_mbps
+WHERE c.is_on_net = FALSE AND (:cid IS NULL OR c.circuit_id = :cid)"""
 GATEWAY_SERVICE = "cdm_tmforum.revenue_assurance.margin_grooming_agent_llm"
 SCORE_FUNCTION = "cdm_tmforum.revenue_assurance.margin_score_onnet_move"
 MLFLOW_EXPERIMENT_ID = "1235449331932066"
@@ -49,10 +84,47 @@ def _stub_score(c):  # same formula as agents/margin_score_onnet_move.sql
     return sav, sc
 
 
+def run_sql(sql, params=None):
+    """Parameterized Statement Execution on the project warehouse. params: {name: (value, type)}."""
+    r = w.statement_execution.execute_statement(
+        warehouse_id=WAREHOUSE_ID, statement=sql, wait_timeout="50s",
+        parameters=[StatementParameterListItem(name=k, value=None if v is None else str(v), type=t)
+                    for k, (v, t) in (params or {}).items()])
+    while r.status.state.value in ("PENDING", "RUNNING"):
+        time.sleep(2)
+        r = w.statement_execution.get_statement(r.statement_id)
+    if r.status.state.value != "SUCCEEDED":
+        raise RuntimeError(f"{r.status.state.value}: {r.status.error.message if r.status.error else ''}")
+    cols = [c.name for c in r.manifest.schema.columns]
+    return [dict(zip(cols, row)) for row in (r.result.data_array or [])]
+
+
+def real_score(cid):
+    rows = run_sql(f"SELECT * FROM {SCORE_FUNCTION}(:cid)", {"cid": (cid, "BIGINT")})
+    for r in rows:
+        r["score_basis"] = "carrier_invoice"
+    return rows
+
+
+def proxy_score(cid):
+    rows = run_sql(PROXY_SQL, {"cid": (cid, "BIGINT")})
+    for r in rows:
+        sav, cost = float(r["est_monthly_savings_usd"]), float(r["monthly_offnet_cost_usd"])
+        r["score"] = int(min(100, max(0, (50 if r["is_parallel_to_onnet_fiber"] == "true" else 0)
+                                     + (50 * max(sav, 0) / cost if cost > 0 else 0))))
+        r["score_basis"] = "proxy"
+    return rows
+
+
 @mlflow.trace(name="ask_margin_genie", span_type=SpanType.TOOL)
 def ask_margin_genie(question):
     if STUB_MODE:
         return {"stub": True, "answer": "STUB: Off-net circuit 45040 runs 51 m from Lakelink Fiber fiber; latest monthly carrier cost USD 2,400.00."}
+    if MARGIN_GENIE_SPACE_ID is None:
+        _last_basis["genie_basis"] = "sql_fallback"
+        return {"genie_basis": "sql_fallback",
+                "note": "Margin Genie space not yet available; answered from margin_circuits + margin_vendors + margin_carrier_invoices. No margin figures returned.",
+                "rows": run_sql(GENIE_FALLBACK_SQL)}
     raise NotImplementedError("Wire Genie Conversation API once P3-MARGIN-GENIE sets the space id")
 
 
@@ -71,7 +143,15 @@ def score_onnet_move(circuit_id):
                         "onnet_distance_m": c["onnet_distance_m"], "monthly_offnet_cost_usd": c["paid_amount_usd"],
                         "est_monthly_savings_usd": sav, "score": sc, "stub": True})
         return out
-    raise NotImplementedError(f"Call SELECT * FROM {SCORE_FUNCTION}(:circuit_id) via Statement Execution API")
+    try:
+        rows = real_score(circuit_id)
+        if rows:
+            _last_basis["score_basis"] = "carrier_invoice"
+            return rows
+    except Exception as e:  # e.g. margin_carrier_invoices absent
+        mlflow.get_current_active_span().set_attribute("real_score_error", str(e)[:300])
+    _last_basis["score_basis"] = "proxy"
+    return proxy_score(circuit_id)
 
 
 @mlflow.trace(name="draft_savings_ticket", span_type=SpanType.TOOL)
@@ -82,6 +162,14 @@ def draft_savings_ticket(circuit_id, vendor_id, monthly_cost, est_monthly_saving
     if STUB_MODE and not rationale.startswith("TEST"):
         rationale = "TEST: " + rationale
     me = w.current_user.me().user_name
+    extra = {}
+    if not STUB_MODE:  # guard: agent must copy tool values, never invent them
+        chk = score_onnet_move(int(circuit_id))
+        if (not chk or float(est_monthly_savings) <= 0
+                or abs(float(chk[0]["est_monthly_savings_usd"]) - float(est_monthly_savings)) > 0.01):
+            return {"error": "values do not match score_onnet_move or savings <= 0; ticket not drafted"}
+        extra = {"identity_mode": "sp" if AGENT_SP_APP_ID else "user_fallback", "score_basis": chk[0]["score_basis"],
+                 "genie_basis": _last_basis.get("genie_basis", "margin_genie"), "score": int(chk[0]["score"])}
     with app_conn() as conn, conn.cursor() as cur, conn.transaction():
         cur.execute(
             """INSERT INTO public.approval_tickets (ticket_id, ticket_type, approver_role, title, circuit_id, vendor_id,
@@ -90,10 +178,10 @@ def draft_savings_ticket(circuit_id, vendor_id, monthly_cost, est_monthly_saving
                VALUES (%s,'offnet_grooming','Ops',%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s)""",
             (tid, f"Move circuit {circuit_id} on-net (Lakelink Fiber)", str(circuit_id), vendor_id, monthly_cost,
              est_monthly_savings, rationale,
-             json.dumps({"stub_run": STUB_MODE, "run_as": me, "telco_project": "margin_analysis"}),
+             json.dumps({"stub_run": STUB_MODE, "run_as": me, "telco_project": "margin_analysis", **extra}),
              AGENT_NAME, AGENT_SP_APP_ID, AGENT_NAME if AGENT_SP_APP_ID else None, MLFLOW_EXPERIMENT_ID, trace_id))
         cur.execute("INSERT INTO public.approval_audit (ticket_id, action, actor, actor_role, details) VALUES (%s,'created',%s,'agent',%s::jsonb)",
-                    (tid, me, json.dumps({"agent": AGENT_NAME, "trace_id": trace_id, "stub_run": STUB_MODE})))
+                    (tid, me, json.dumps({"agent": AGENT_NAME, "trace_id": trace_id, "stub_run": STUB_MODE, **extra})))
     return {"ticket_id": tid, "status": "pending"}
 
 
@@ -129,4 +217,5 @@ def run_agent(task, max_turns=8):
 
 if __name__ == "__main__":
     print(run_agent("Find Lakelink Fiber off-net circuits that run next to our own fiber and draft savings tickets "
-                    "for good candidates. Start by asking Margin Genie, then score circuit 45040."))
+                    "for good candidates. Start by asking Margin Genie which off-net circuits run next to our own "
+                    "fiber and what we pay for them, then score circuits 45040 and 98532 individually."))

@@ -16,6 +16,8 @@ const WAREHOUSE_ID = process.env.DATABRICKS_WAREHOUSE_ID ?? "";
 const MARGIN_MV = process.env.MARGIN_MV ?? "cdm_tmforum._metrics.margin_ledger_mv";
 const GENIE_SPACE_ID = process.env.GENIE_SPACE_ID ?? "";
 const MLFLOW_EXPERIMENT_ID = process.env.MLFLOW_EXPERIMENT_ID ?? "";
+// Feature flag (APP-EXPLORER-PRESTAGE): auto = go live as soon as the metric view exists; on = always query; off = hide.
+const EXPLORER_MODE = (process.env.MARGIN_EXPLORER_MODE ?? "auto").toLowerCase() as "auto" | "on" | "off";
 const PORT = Number(process.env.DATABRICKS_APP_PORT ?? process.env.PORT ?? 8000);
 
 const APPROVER_ROLES = ["Ops", "AP", "FP&A"] as const;
@@ -105,6 +107,22 @@ GROUP BY ALL
 ORDER BY contribution_margin ASC`;
 }
 
+// Explorer readiness: in auto mode, check the metric view exists (cached 60s) so the tab goes live the moment it deploys.
+let mvCheck: { ready: boolean; at: number } | null = null;
+export async function explorerReady(): Promise<boolean> {
+  if (EXPLORER_MODE === "off") return false;
+  if (EXPLORER_MODE === "on") return true;
+  if (mvCheck && Date.now() - mvCheck.at < 60_000) return mvCheck.ready;
+  const [cat, sch, name] = MARGIN_MV.split(".");
+  if (!/^[a-z_]+$/.test(cat ?? "")) throw new Error("bad metric view name");
+  const rows = await runSql(
+    `SELECT table_type FROM ${cat}.information_schema.tables WHERE table_schema = :sch AND table_name = :name`,
+    [{ name: "sch", value: sch ?? "" }, { name: "name", value: name ?? "" }],
+  );
+  mvCheck = { ready: rows.length === 1, at: Date.now() };
+  return mvCheck.ready;
+}
+
 // ---------- API ----------
 const app = express();
 app.use(express.json());
@@ -183,10 +201,19 @@ app.get("/api/tickets/:id/evidence", async (req: Request, res: Response) => {
   }
 });
 
+app.get("/api/explorer/status", async (_req: Request, res: Response) => {
+  try {
+    res.json({ mode: EXPLORER_MODE, ready: await explorerReady(), metricView: MARGIN_MV });
+  } catch (e) {
+    res.status(502).json({ error: (e as Error).message, mode: EXPLORER_MODE, metricView: MARGIN_MV });
+  }
+});
+
 app.get("/api/explorer", async (req: Request, res: Response) => {
   const dim = String(req.query.dim ?? "product_family");
   const quarter = String(req.query.quarter ?? "");
   try {
+    if (!(await explorerReady())) return res.status(503).json({ error: "pending_mv", metricView: MARGIN_MV });
     const rows = await runSql(explorerSql(dim), [{ name: "quarter", value: quarter, type: "STRING" }]);
     res.json({ metricView: MARGIN_MV, dimension: dim, rows });
   } catch (e) {

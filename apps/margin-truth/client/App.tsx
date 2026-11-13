@@ -143,9 +143,11 @@ function MarginExplorer({ metricView }: { metricView: string }) {
   const [dim, setDim] = useState("product_family");
   const [rows, setRows] = useState<ExplorerRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
   useEffect(() => {
-    setRows(null); setError(null);
-    api<{ rows: ExplorerRow[] }>(`/api/explorer?dim=${dim}`).then((r) => setRows(r.rows)).catch((e) => setError(e.message));
+    setRows(null); setError(null); setPending(false);
+    api<{ rows: ExplorerRow[] }>(`/api/explorer?dim=${dim}`).then((r) => setRows(r.rows))
+      .catch((e) => (e.message === "pending_mv" ? setPending(true) : setError(e.message)));
   }, [dim]);
   return (
     <section aria-labelledby="exp-h">
@@ -154,8 +156,9 @@ function MarginExplorer({ metricView }: { metricView: string }) {
       <div className="llf-card"><label>Break down by{" "}
         <select value={dim} onChange={(e) => setDim(e.target.value)}>{DIMENSIONS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
       </label></div>
+      {pending && <p className="llf-state" role="status">The margin explorer goes live when the governed metric view is published. Until then, ask in Margin Genie.</p>}
       {error && <p role="alert" className="llf-error">Metric view unavailable. Try again or ask in Margin Genie. <small>({error})</small></p>}
-      {rows === null && !error && <p className="llf-state" aria-live="polite">Loading margin...</p>}
+      {rows === null && !error && !pending && <p className="llf-state" aria-live="polite">Loading margin...</p>}
       {rows?.length === 0 && <p className="llf-state">No ledger rows yet.</p>}
       {rows && rows.length > 0 && (
         <div className="llf-card llf-table-wrap"><table>
