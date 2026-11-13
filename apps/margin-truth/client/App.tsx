@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type Reac
 
 type Ticket = {
   ticket_id: string; ticket_type: string; approver_role: string; title: string;
-  circuit_id: string | null; vendor_id: string | null; customer_id: string | null;
+  circuit_id: string | null; vendor_id: string | null; vendor_name?: string | null; customer_id: string | null;
   monthly_cost: string | null; est_monthly_savings: string | null; rationale: string | null;
   agent_name: string; agent_sp_name: string | null; trace_id: string | null;
   status: string; created_at: string; decided_by: string | null; decided_at: string | null;
@@ -59,6 +59,8 @@ function ApprovalQueue() {
   const [evidence, setEvidence] = useState<Evidence | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [announce, setAnnounce] = useState("");
+  // DSN-SCENE5-R1 item 2: optional approver comment per ticket (server caps at 2000 chars)
+  const [comments, setComments] = useState<Record<string, string>>({});
   const evidenceHeading = useRef<HTMLHeadingElement>(null);
   const focusEvidence = useRef(false);
   useEffect(() => {
@@ -81,7 +83,8 @@ function ApprovalQueue() {
     if (savingId) return; // prevents double submit
     setSavingId(id); setAnnounce("");
     try {
-      await api(`/api/tickets/${encodeURIComponent(id)}/decision`, { method: "POST", body: JSON.stringify({ decision, role }) });
+      await api(`/api/tickets/${encodeURIComponent(id)}/decision`, { method: "POST", body: JSON.stringify({ decision, role, comment: (comments[id] ?? "").trim() }) });
+      setComments((c) => { const { [id]: _done, ...rest } = c; return rest; });
       setAnnounce(`${title} ${decision === "approved" ? "approved" : "rejected"} by ${role}. Decision recorded in the audit log.`);
       load(false);
       if (decision === "approved") { focusEvidence.current = true; await showEvidence(id); }
@@ -120,14 +123,20 @@ function ApprovalQueue() {
             <tbody>
               {tickets.map((t) => (
                 <tr key={t.ticket_id}>
-                  <td><strong>{t.title}</strong><br /><small>{t.ticket_id}</small></td>
-                  <td>{orNA(t.circuit_id)}</td><td>{orNA(t.vendor_id)}</td>
+                  <td><strong>{t.title}</strong><br /><small>{t.ticket_id}</small>
+                    {t.rationale && <p className="llf-rationale">{t.rationale}</p>}</td>
+                  <td>{orNA(t.circuit_id)}</td>
+                  <td>{t.vendor_name ? <>{t.vendor_name}<br /><small className="llf-muted">{t.vendor_id}</small></> : orNA(t.vendor_id)}</td>
                   <td className="num">{fmtUsd(t.monthly_cost)}</td><td className="num">{fmtUsd(t.est_monthly_savings)}</td>
                   <td>{t.agent_name}</td><td><StatusBadge status={t.status} /></td>
                   <td><div className="llf-actions">
                     {t.status === "pending" ? (savingId === t.ticket_id ? (
                       <button className="llf-btn" disabled aria-disabled="true">Saving...</button>
                     ) : (<>
+                      <label className="llf-comment">Comment (optional)
+                        <input type="text" maxLength={2000} value={comments[t.ticket_id] ?? ""} disabled={savingId !== null}
+                          onChange={(e) => { const v = e.target.value; setComments((c) => ({ ...c, [t.ticket_id]: v })); }} />
+                      </label>
                       <button className="llf-btn llf-btn--approve" disabled={savingId !== null} onClick={() => decide(t.ticket_id, t.title, "approved")} aria-label={`Approve ${t.title}`}>Approve</button>
                       <button className="llf-btn llf-btn--reject" disabled={savingId !== null} onClick={() => decide(t.ticket_id, t.title, "rejected")} aria-label={`Reject ${t.title}`}>Reject</button>
                     </>)) : (

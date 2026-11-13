@@ -495,10 +495,14 @@
     },
     {
       "name": "ds_wall_trend",
-      "displayName": "$1B Wall identified value by month (placeholder)",
+      "displayName": "$1B Wall challenge cards by persona (margin_onebillion_wall_mv)",
       "queryLines": [
-        "-- PLACEHOLDER (DSN-DASH-SKELETON): replace with cdm_tmforum._metrics.margin_onebillion_wall_mv when P2-MV-SUITE lands. $1B Wall definition comes from its glossary page; @designer does not define it.\n",
-        "SELECT ledger_month, CAST(NULL AS DECIMAL(18,2)) AS identified_value, CAST(1000000000 AS DECIMAL(18,2)) AS wall_target FROM (SELECT ledger_month FROM cdm_tmforum._metrics.margin_ledger_mv GROUP BY ledger_month)\n"
+        "-- Challenge card values: MEASURE(identified_savings) per owner persona from margin_onebillion_wall_mv (lever grain, no month). CM is never redefined here (DEC-002).\n",
+        "SELECT MAX(CASE WHEN owner_persona = 'Finance' THEN identified_value END) AS finance_value,\n",
+        "       MAX(CASE WHEN owner_persona = 'Ops' THEN identified_value END) AS ops_value,\n",
+        "       MAX(CASE WHEN owner_persona = 'Sales' THEN identified_value END) AS sales_value\n",
+        "FROM (SELECT owner_persona, MEASURE(identified_savings) AS identified_value\n",
+        "      FROM cdm_tmforum._metrics.margin_onebillion_wall_mv GROUP BY owner_persona)\n"
       ]
     }
   ],
@@ -1891,7 +1895,7 @@
                 "# $1B Wall tracker\n",
                 "How close are we to the $1B Wall, and which levers move us?\n",
                 "\n",
-                "Wall values populate when the $1B Wall metric view is deployed. Contribution margin always comes from margin_ledger_mv.\n"
+                "Values come from margin_onebillion_wall_mv. Contribution margin always comes from margin_ledger_mv. Challenge cards below show each persona's identified value.\n"
               ]
             }
           },
@@ -2192,101 +2196,6 @@
         },
         {
           "widget": {
-            "name": "w2_6_trend",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "ds_wall_trend",
-                  "fields": [
-                    {
-                      "name": "monthly(ledger_month)",
-                      "expression": "DATE_TRUNC(\"MONTH\", `ledger_month`)"
-                    },
-                    {
-                      "name": "sum(identified_value)",
-                      "expression": "SUM(`identified_value`)"
-                    },
-                    {
-                      "name": "max(wall_target)",
-                      "expression": "MAX(`wall_target`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 3,
-              "widgetType": "line",
-              "encodings": {
-                "x": {
-                  "fieldName": "monthly(ledger_month)",
-                  "scale": {
-                    "type": "temporal"
-                  },
-                  "displayName": "Month"
-                },
-                "y": {
-                  "scale": {
-                    "type": "quantitative"
-                  },
-                  "fields": [
-                    {
-                      "fieldName": "sum(identified_value)",
-                      "displayName": "Identified value"
-                    },
-                    {
-                      "fieldName": "max(wall_target)",
-                      "displayName": "$1B target"
-                    }
-                  ],
-                  "format": {
-                    "type": "number-currency",
-                    "currencyCode": "USD",
-                    "abbreviation": "compact",
-                    "decimalPlaces": {
-                      "type": "max",
-                      "places": 1
-                    }
-                  }
-                },
-                "color": {
-                  "scale": {
-                    "type": "categorical",
-                    "mappings": [
-                      {
-                        "value": "Identified value",
-                        "color": "#1B3139"
-                      },
-                      {
-                        "value": "$1B target",
-                        "color": "#5A6B72"
-                      }
-                    ]
-                  }
-                },
-                "label": {
-                  "show": true
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "How has identified value grown?",
-                "showDescription": true,
-                "description": "Source: margin_onebillion_wall_mv. $1B target shown as a labeled reference series (make it dashed on import)."
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 9,
-            "width": 6,
-            "height": 4
-          }
-        },
-        {
-          "widget": {
             "name": "w2_7_detail",
             "queries": [
               {
@@ -2357,7 +2266,7 @@
           },
           "position": {
             "x": 0,
-            "y": 13,
+            "y": 12,
             "width": 6,
             "height": 6
           }
@@ -2376,9 +2285,171 @@
           },
           "position": {
             "x": 0,
-            "y": 19,
+            "y": 18,
             "width": 6,
             "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "w2_6_card_finance",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_wall_trend",
+                  "fields": [
+                    {
+                      "name": "sum(finance_value)",
+                      "expression": "SUM(`finance_value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(finance_value)",
+                  "displayName": "Identified value",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "USD",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  },
+                  "style": {
+                    "color": "#1B3139"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Finance card: Legacy repricing + revenue leakage",
+                "showDescription": true,
+                "description": "Ask Margin Genie: Which loss-making legacy families and leakage could we recover? Source: margin_onebillion_wall_mv, owner Finance"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "w2_6_card_ops",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_wall_trend",
+                  "fields": [
+                    {
+                      "name": "sum(ops_value)",
+                      "expression": "SUM(`ops_value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(ops_value)",
+                  "displayName": "Identified value",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "USD",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  },
+                  "style": {
+                    "color": "#1B3139"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Ops card: Off-net grooming + carrier rate variance",
+                "showDescription": true,
+                "description": "Ask Margin Genie: Which off-net circuits run next to our own fiber? Source: margin_onebillion_wall_mv, owner Ops"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 9,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "w2_6_card_sales",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_wall_trend",
+                  "fields": [
+                    {
+                      "name": "sum(sales_value)",
+                      "expression": "SUM(`sales_value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(sales_value)",
+                  "displayName": "Identified value",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "USD",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  },
+                  "style": {
+                    "color": "#1B3139"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Sales card: Renewals below the margin floor",
+                "showDescription": true,
+                "description": "Ask Margin Genie: Which renewals in the next 90 days are below the margin floor? Source: margin_onebillion_wall_mv, owner Sales"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 9,
+            "width": 2,
+            "height": 3
           }
         }
       ],

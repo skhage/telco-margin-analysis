@@ -110,6 +110,26 @@ GROUP BY ALL
 ORDER BY contribution_margin ASC`;
 }
 
+// DSN-SCENE5-R1 item 4: vendor display names (fictional Lakelink-safe carrier names) from the governed vendor table.
+// Loaded once (30 rows), cached 10 min. If the warehouse or grant is unavailable, the UI falls back to the raw vendor_id.
+const MARGIN_VENDORS = process.env.MARGIN_VENDORS ?? "cdm_tmforum.revenue_assurance.margin_vendors";
+let vendorCache: { names: Record<string, string>; at: number } | null = null;
+async function vendorNames(): Promise<Record<string, string>> {
+  if (vendorCache && Date.now() - vendorCache.at < 600_000) return vendorCache.names;
+  try {
+    if (!/^[a-z_]+\.[a-z_]+\.margin_[a-z_]+$/.test(MARGIN_VENDORS)) throw new Error("bad vendor table name");
+    const rows = await runSql(`SELECT vendor_id, vendor_name FROM ${MARGIN_VENDORS}`);
+    const names = Object.fromEntries(rows.filter((r) => r.vendor_id && r.vendor_name).map((r) => [String(r.vendor_id), String(r.vendor_name)]));
+    vendorCache = { names, at: Date.now() };
+    return names;
+  } catch (e) {
+    console.warn(`vendor name lookup failed: ${(e as Error).message}`);
+    return vendorCache?.names ?? {};
+  }
+}
+const withVendorName = <T extends { vendor_id?: string | null }>(row: T, names: Record<string, string>) =>
+  ({ ...row, vendor_name: row.vendor_id ? names[row.vendor_id] ?? null : null });
+
 // Explorer readiness: in auto mode, check the metric view exists (cached 60s) so the tab goes live the moment it deploys.
 let mvCheck: { ready: boolean; at: number } | null = null;
 export async function explorerReady(): Promise<boolean> {
@@ -147,7 +167,8 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
         ORDER BY created_at DESC LIMIT 200`,
       [role, status, SHOW_TEST_TICKETS],
     );
-    res.json(rows);
+    const names = await vendorNames();
+    res.json(rows.map((r) => withVendorName(r, names)));
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
   }
@@ -194,7 +215,7 @@ app.get("/api/tickets/:id/evidence", async (req: Request, res: Response) => {
     const t = await pool.query("SELECT * FROM public.approval_tickets WHERE ticket_id = $1", [req.params.id]);
     if (t.rowCount !== 1) return res.status(404).json({ error: "not found" });
     const a = await pool.query("SELECT action, actor, actor_role, details, at FROM public.approval_audit WHERE ticket_id = $1 ORDER BY at", [req.params.id]);
-    const ticket = t.rows[0];
+    const ticket = withVendorName(t.rows[0], await vendorNames());
     // APP-TRACE-VIEW-PREBUILD: the agent's 'created' audit row carries run_as / identity_mode / trace_id (grooming agent writes these).
     const created = a.rows.find((r) => r.action === "created");
     const createdDetails = (created?.details ?? {}) as Record<string, unknown>;

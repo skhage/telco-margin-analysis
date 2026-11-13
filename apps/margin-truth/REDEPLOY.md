@@ -9,6 +9,7 @@ See `resources/CEO_ACTION_SHEET.md` gate 1 for the exact statements. The app cod
 * `public.approval_tickets`: SELECT, UPDATE (queue + decision)
 * `public.approval_audit`: SELECT, INSERT (audit trail + evidence)
 * `public.approval_audit_audit_id_seq`: USAGE (audit insert)
+* Optional (DSN-SCENE5-R1 vendor names): UC SELECT on `cdm_tmforum.revenue_assurance.margin_vendors` for the app SP. Without it the Vendor column shows only the raw ID, and nothing else breaks.
 
 On 2026-11-13 (app-developer run #11) the SP role exists but has no SELECT/UPDATE/INSERT on either table.
 
@@ -26,7 +27,7 @@ The platform runs `npm install` and `npm run build` (server `tsc` + client `vite
 
 ## Verify after deploy (2 minutes)
 1. `databricks apps get lakelink-margin-truth`: `active_deployment.create_time` is later than the deploy command, and the status is RUNNING.
-2. Open the app URL and go to the Approval queue with role Ops. You should see 2 pending tickets, GROOM-44c3612b69 (circuit 45040, savings 879.34) and GROOM-6d8f8ce31e (circuit 98532, savings 469.00), and no TEST-GROOM-4d4c099b0e.
+2. Open the app URL and go to the Approval queue with Approver role = Ops. You should see 2 pending tickets and no TEST-GROOM-4d4c099b0e. GROOM-44c3612b69 shows circuit 45040, vendor Partner Carrier 55, monthly cost $2,880, est. monthly savings $879. GROOM-6d8f8ce31e shows circuit 98532, vendor Partner Carrier 47, $2,470, $469. Each row also shows the rationale under the title and a Comment (optional) field. The app shows whole dollars; exact cents (879.34 / 469.00) are in SCENE5_CLICK_SCRIPT.md fixed data.
 3. Margin explorer, product_family, all quarters: the total contribution margin is 2,375,095,705.09 (DEC-020). Quarter 2026-07-01 is 590,767,062.41.
 4. The Margin Genie panel loads (the iframe shows the space, not a sign-in or 404 page).
 5. Scene 6: approve one hero ticket in a rehearsal only (see SCENE5_CLICK_SCRIPT.md), then check the evidence panel shows `User identity (fallback): ran as stephen.hage@databricks.com`, trace `tr-d9fef3bfbebebdad7bedf0bb88cd0f83`, experiment `1235449331932066`, and 2 audit entries (Created, Approved).

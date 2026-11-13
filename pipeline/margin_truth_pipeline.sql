@@ -95,6 +95,8 @@ CREATE OR REFRESH MATERIALIZED VIEW margin_ledger_v2 (
   allocation_rule_version STRING COMMENT 'Allocation rule set used for cost_to_serve_usd (MGN-ALR-v1 = active margin_allocation_rules at build time). Synonyms: rule set.',
   origin STRING COMMENT 'Data origin: MIXED (real Salesforce/TMF keys with synthetic amounts and drivers).',
   source_system STRING COMMENT 'Build that produced the row: margin_sdp_pipeline (Lakeflow Spark Declarative Pipeline gold, same logic as the margin_fastpath_sql fast path, DEC-008/DEC-023).',
+  source_pdf_path STRING COMMENT 'UC volume path of the carrier invoice PDF that backs this row, taken from margin_silver_invoice_parsed (ai_parse_document + ai_extract). NULL when no PDF is on file for the circuit and month (only off-net October 2026 sample invoices have PDFs). Scene 2 click path: answer -> ledger -> lineage -> source PDF. Synonyms: source document, invoice pdf, document path.',
+  source_pdf_invoice_number STRING COMMENT 'Carrier invoice number that ai_extract read from the source PDF (LLF-CI-... format). NULL when no PDF is on file. Synonyms: carrier invoice number, extracted invoice number.',
   CONSTRAINT pk_not_null EXPECT (ledger_month IS NOT NULL AND customer_id IS NOT NULL AND product_id IS NOT NULL AND circuit_id IS NOT NULL) ON VIOLATION FAIL UPDATE,
   CONSTRAINT no_carrier_overcharge EXPECT (carrier_rate_variance_usd <= 0),
   CONSTRAINT billed_revenue_present EXPECT (revenue_usd > 0),
@@ -147,7 +149,9 @@ WITH base AS (
         ELSE
           CASE WHEN PMOD(XXHASH64(b.circuit_id, b.billing_month), 100) < 25 THEN 1 ELSE 0 END
       END AS INT
-    ) AS ticket_count
+    ) AS ticket_count,
+    regexp_replace(s.path, '^dbfs:', '')                     AS source_pdf_path,
+    CAST(s.extracted:response.invoice_number.value AS STRING) AS source_pdf_invoice_number
   FROM      cdm_tmforum.revenue_assurance.margin_billing          b
   JOIN      cdm_tmforum.revenue_assurance.margin_circuits          c  ON c.circuit_id  = b.circuit_id
   JOIN      cdm_tmforum.revenue_assurance.margin_contracts         k  ON k.contract_id = b.contract_id
@@ -155,6 +159,9 @@ WITH base AS (
   JOIN      cdm_tmforum.revenue_assurance.margin_customers         u  ON u.customer_id = b.customer_id
   LEFT JOIN cdm_tmforum.revenue_assurance.margin_carrier_invoices ci  ON ci.circuit_id = b.circuit_id
                                                                     AND ci.invoice_month = b.billing_month
+  -- QA-F-S2-PDF-LINEAGE: gold reads silver so table_lineage shows PDF -> bronze -> silver -> ledger.
+  -- Silver grain = one row per PDF path; Auto Loader paths carry a 'dbfs:' prefix. Attributes only, no CM impact.
+  LEFT JOIN margin_silver_invoice_parsed                             s  ON regexp_replace(s.path, '^dbfs:', '') = ci.source_pdf_path
 ),
 tot AS (
   SELECT ledger_month,
@@ -206,7 +213,9 @@ SELECT
   b.revenue_usd AS billed_revenue_usd,
   'MGN-ALR-v1'          AS allocation_rule_version,
   'MIXED'               AS origin,
-  'margin_sdp_pipeline' AS source_system
+  'margin_sdp_pipeline' AS source_system,
+  b.source_pdf_path,
+  b.source_pdf_invoice_number
 FROM base b
 JOIN tot  t  USING (ledger_month)
 LEFT JOIN pw USING (ledger_month);

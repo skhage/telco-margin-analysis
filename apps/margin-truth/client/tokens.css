@@ -60,6 +60,12 @@ td.num, th.num { text-align: right; }
 .llf-evidence dd { margin: 0; }
 .llf-evidence a { color: var(--llf-primary-ink); }
 @media (max-width: 720px) { .llf-evidence { grid-template-columns: 1fr; } .llf-evidence dd { margin-bottom: var(--llf-space-1); } }
+/* DSN-SCENE5-R1: ticket rationale (muted, small), vendor ID sub-label, optional approver comment field */
+.llf-rationale { margin: var(--llf-space-1) 0 0 0; color: var(--llf-muted); font-size: 13px; max-width: 48ch; }
+.llf-muted { color: var(--llf-muted); }
+.llf-comment { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--llf-muted); flex-basis: 100%; }
+.llf-comment input { font: inherit; font-size: 14px; min-height: 40px; padding: 0 var(--llf-space-1); border: 1px solid var(--llf-border-strong); border-radius: var(--llf-radius); background: var(--llf-card); color: var(--llf-text); }
+.llf-comment input:focus-visible { outline: 3px solid var(--llf-focus); outline-offset: 2px; }
 .llf-genie { width: 100%; height: min(640px, 75vh); border: 1px solid var(--llf-border); border-radius: var(--llf-radius); }
 body, main { overflow-wrap: anywhere; }
 .llf-header h1 { min-width: 0; }
