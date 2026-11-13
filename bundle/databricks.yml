@@ -65,8 +65,20 @@ presets:
     telco_project: ${var.project_tag}
 
 targets:
+  # Full target: jobs + the live dashboard, app, and pipeline (declared under targets.dev in their
+  # resource files). Bind the live assets first (DEPLOY_RUNBOOK.md step 3); needs CEO OK for [dev] rename.
   dev:
     mode: development
     default: true
+    workspace:
+      root_path: ~/.bundle/${bundle.name}/${bundle.target}
+
+  # DEVOPS-JOBS-ONLY-FALLBACK (default plan for P6-DAB-DEPLOY): deploys ONLY the 4 jobs (UC functions,
+  # metric views, synth generator, stall monitor) plus synced source. The live dashboard, Genie space,
+  # pipeline, and app are NOT declared here, so nothing is bound, created, or [dev]-renamed.
+  # No mode => no name prefix and schedules keep the state set in the job yml.
+  #   databricks bundle validate --strict -t jobs_only
+  #   databricks bundle deploy -t jobs_only
+  jobs_only:
     workspace:
       root_path: ~/.bundle/${bundle.name}/${bundle.target}

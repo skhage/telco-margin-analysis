@@ -54,17 +54,17 @@ After the deploy, run these checks:
 * `lakelink-margin-stall-monitor` schedule state: check the DEPLOYED job (the yml sets UNPAUSED explicitly).
 * @qa reruns P2-MV-VALIDATION: `MEASURE(contribution_margin)` = 2,375,095,705.09 (DEC-020).
 
-## 5. Jobs-only fallback (no bind, live assets untouched)
+## 5. Jobs-only fallback: target `jobs_only` (DEFAULT plan for P6-DAB-DEPLOY; no bind, live assets untouched)
 
-`bundle deploy` cannot deploy a subset of resources. To ship only the jobs, take the resolved job specs from the bundle and manage them with the Jobs CLI:
+The dashboard, app, and pipeline are declared under `targets.dev.resources` in their resource files, so the `jobs_only` target contains ONLY the 4 jobs plus synced source. Nothing is bound, created, or `[dev]`-renamed. The Genie space is never a bundle resource. `jobs_only` has no `mode`, so job names have no prefix and schedules follow the job yml (the stall monitor is UNPAUSED).
 
 ```
-databricks bundle validate --output json > /tmp/margin_bundle.json
-# For each key in .resources.jobs (margin_functions_job, margin_metric_views_job, margin_synth_generator_job, margin_stall_monitor_job):
-#   extract .resources.jobs.<key> to /tmp/<key>.json, then
-databricks jobs create --json @/tmp/<key>.json            # first time
-databricks jobs reset --json '{"job_id": <id>, "new_settings": <spec>}'   # later runs
+databricks bundle validate --strict -t jobs_only
+databricks bundle summary -t jobs_only      # expect Jobs: 4, no Apps/Dashboards/Pipelines
+databricks bundle deploy -t jobs_only
 ```
+
+Expected `jobs_only` resources: jobs 4 (lakelink-margin-functions, lakelink-margin-metric-views, lakelink-margin-synth-generator, lakelink-margin-stall-monitor), apps 0, dashboards 0, pipelines 0, schemas 0. `bundle destroy -t jobs_only` only removes those 4 jobs.
 
 The synth generator and metric-view jobs run as a dry run by default. Running them with `--execute` OVERWRITES live demo tables, so rerun the cm_regression_harness after any execute run.
 

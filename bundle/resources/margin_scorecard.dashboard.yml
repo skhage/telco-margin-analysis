@@ -6,14 +6,18 @@
 # ONE-DASHBOARD CAP: before any deploy, BIND this key to the live dashboard instead of creating a
 # second one: databricks bundle deployment bind margin_scorecard 01f1df1950c51bd68e87ace31632c2bf
 # (see ../DEPLOY_RUNBOOK.md).
-resources:
-  dashboards:
-    margin_scorecard:
-      display_name: Lakelink Fiber Margin Truth
-      file_path: "../../src/dashboards/Lakelink Fiber Margin Truth.lvdash.json"
-      warehouse_id: ${var.warehouse_id}
-      dataset_catalog: ${var.catalog}
-      dataset_schema: ${var.metrics_schema}
+# DEVOPS-JOBS-ONLY-FALLBACK: declared under targets.dev only, so the jobs_only target never
+# creates, binds, or [dev]-renames the live dashboard.
+targets:
+  dev:
+    resources:
+      dashboards:
+        margin_scorecard:
+          display_name: Lakelink Fiber Margin Truth
+          file_path: "../../src/dashboards/Lakelink Fiber Margin Truth.lvdash.json"
+          warehouse_id: ${var.warehouse_id}
+          dataset_catalog: ${var.catalog}
+          dataset_schema: ${var.metrics_schema}
 
 # Margin Genie ('Lakelink Fiber Margin Genie', space 01f1df115a08164aab3ae5f6faac807c): the space is a
 # workspace object that git folders do not support (gitignored like the MLflow experiment). Its config

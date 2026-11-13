@@ -7,16 +7,20 @@
 #   databricks bundle deployment bind margin_pipeline 20960984-a9d3-46f4-826a-6301155bc79a
 # (see ../DEPLOY_RUNBOOK.md). Only the SQL file is a library; pipeline/margin_truth_pipeline
 # (notebook) is the superseded copy (asset_ledger row 68) and is NOT referenced.
-resources:
-  pipelines:
-    margin_pipeline:
-      name: Lakelink Fiber Margin Truth Pipeline
-      catalog: ${var.catalog}
-      schema: ${var.schema}
-      serverless: true
-      channel: CURRENT
-      photon: true
-      continuous: false
-      libraries:
-        - file:
-            path: ../../pipeline/margin_truth_pipeline.sql
+# DEVOPS-JOBS-ONLY-FALLBACK: declared under targets.dev only, so the jobs_only target never
+# creates, binds, or [dev]-renames the live pipeline.
+targets:
+  dev:
+    resources:
+      pipelines:
+        margin_pipeline:
+          name: Lakelink Fiber Margin Truth Pipeline
+          catalog: ${var.catalog}
+          schema: ${var.schema}
+          serverless: true
+          channel: CURRENT
+          photon: true
+          continuous: false
+          libraries:
+            - file:
+                path: ../../pipeline/margin_truth_pipeline.sql
