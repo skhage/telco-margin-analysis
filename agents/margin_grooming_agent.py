@@ -30,6 +30,12 @@ DRY RUN (ML-GROOMING-DRYRUN-TOOLS, 2026-11-13):
 LIVE GENIE RUN (P4-GROOMING-AGENT, 2026-11-13): real Margin Genie returned total_row_count=47; trace
 tr-f09d04073ced6c20fad2e0100ad00eb2. DEDUP GUARD: draft_savings_ticket returns existing_ticket when a non-TEST pending
 offnet_grooming ticket already exists for the circuit, so re-runs never duplicate GROOM-44c3612b69 / GROOM-6d8f8ce31e.
+
+SCENE-6 HERO TRACE (COO-Q-20261113-28 / QA-F-TRACE-SUITE-MV-R1, 2026-11-13): DRY_RUN trace
+tr-7e87cf4df0dfdbf4a2ae39e1f1ab0478 - ask_margin_genie genie_basis=margin_genie, Genie SQL FROM
+cdm_tmforum._metrics.margin_offnet_spend_mv WHERE is_grooming_candidate, total_row_count=47 (= 412,539.96 annual,
+same as the scene-4 Ops answer); dedup returned GROOM-44c3612b69 / GROOM-6d8f8ce31e, 0 new tickets.
+Ask Genie the exact scene-4 Ops question so it routes to the suite MV.
 """
 import json, time, uuid
 import mlflow, psycopg

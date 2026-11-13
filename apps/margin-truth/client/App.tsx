@@ -9,9 +9,19 @@ type Ticket = {
   status: string; created_at: string; decided_by: string | null; decided_at: string | null;
 };
 type Evidence = {
-  ticket: Ticket; traceUrl: string | null;
-  agentIdentity: { name: string; servicePrincipal: string | null; applicationId: string | null };
-  audit: { action: string; actor: string; actor_role: string | null; at: string }[];
+  ticket: Ticket; traceUrl: string | null; traceId: string | null; experimentId: string | null;
+  agentIdentity: { name: string; servicePrincipal: string | null; applicationId: string | null; identityMode: "service_principal" | "user_fallback"; runAs: string | null };
+  audit: { action: string; actor: string; actor_role: string | null; details: Record<string, unknown> | null; at: string }[];
+};
+// APP-TRACE-VIEW-PREBUILD: short, readable summary of an audit row's details JSON (comment, identity mode, score)
+const auditDetail = (d: Record<string, unknown> | null): ReactNode => {
+  if (!d) return <NotAvailable />;
+  const parts: string[] = [];
+  if (typeof d.comment === "string" && d.comment) parts.push(`Comment: ${d.comment}`);
+  if (d.identity_mode === "user_fallback") parts.push("Ran as user identity (fallback)");
+  if (typeof d.run_as === "string") parts.push(`Run as ${d.run_as}`);
+  if (d.score != null) parts.push(`On-net score ${String(d.score)}`);
+  return parts.length ? parts.join("; ") : <NotAvailable />;
 };
 type ExplorerRow = Record<string, string | null>;
 type Config = { genieSpaceId: string; workspaceHost: string; mlflowExperimentId: string; metricView: string };
@@ -133,10 +143,23 @@ function ApprovalQueue() {
       {evidence && (
         <section className="llf-card" aria-labelledby="ev-h">
           <h3 id="ev-h" ref={evidenceHeading} tabIndex={-1}>Evidence for {evidence.ticket.ticket_id}</h3>
-          <p><strong>Agent:</strong> {evidence.agentIdentity.name} | <strong>Service principal:</strong> {evidence.agentIdentity.servicePrincipal ?? "not recorded"} {evidence.agentIdentity.applicationId ? `(${evidence.agentIdentity.applicationId})` : ""}</p>
-          <p><strong>MLflow trace:</strong> {evidence.traceUrl ? <a href={evidence.traceUrl} target="_blank" rel="noreferrer">Open trace {evidence.ticket.trace_id}</a> : "no trace recorded"}</p>
-          <div className="llf-table-wrap"><table><caption className="llf-caption">Audit record</caption><thead><tr><th>When</th><th>Action</th><th>Actor</th><th>Role</th></tr></thead>
-            <tbody>{evidence.audit.map((a, i) => <tr key={i}><td>{new Date(a.at).toLocaleString()}</td><td>{a.action}</td><td>{a.actor}</td><td>{orNA(a.actor_role)}</td></tr>)}</tbody>
+          <dl className="llf-evidence">
+            <dt>Agent</dt><dd>{evidence.agentIdentity.name}</dd>
+            <dt>Service principal</dt>
+            <dd>{evidence.agentIdentity.identityMode === "service_principal"
+              ? <>{orNA(evidence.agentIdentity.servicePrincipal)}{evidence.agentIdentity.applicationId ? ` (application ID ${evidence.agentIdentity.applicationId})` : ""}</>
+              : <>User identity (fallback){evidence.agentIdentity.runAs ? `: ran as ${evidence.agentIdentity.runAs}` : ""}</>}</dd>
+            <dt>MLflow trace</dt>
+            <dd>{evidence.traceId
+              ? (evidence.traceUrl
+                ? <a href={evidence.traceUrl} target="_blank" rel="noreferrer">Open trace {evidence.traceId}<span className="llf-sr-only"> (opens in a new tab)</span></a>
+                : evidence.traceId)
+              : "No trace recorded"}</dd>
+            <dt>MLflow experiment</dt><dd>{orNA(evidence.experimentId)}</dd>
+            <dt>Decision</dt><dd><StatusBadge status={evidence.ticket.status} />{evidence.ticket.decided_by ? ` by ${evidence.ticket.decided_by}` : ""}{evidence.ticket.decided_at ? ` on ${new Date(evidence.ticket.decided_at).toLocaleString()}` : ""}</dd>
+          </dl>
+          <div className="llf-table-wrap"><table><caption className="llf-caption">Audit record ({plural(evidence.audit.length, "entry", "entries")})</caption><thead><tr><th>When</th><th>Action</th><th>Actor</th><th>Role</th><th>Details</th></tr></thead>
+            <tbody>{evidence.audit.map((a, i) => <tr key={i}><td>{new Date(a.at).toLocaleString()}</td><td>{sentence(a.action)}</td><td>{a.actor}</td><td>{orNA(a.actor_role)}</td><td>{auditDetail(a.details)}</td></tr>)}</tbody>
           </table></div>
         </section>
       )}

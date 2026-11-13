@@ -195,12 +195,26 @@ app.get("/api/tickets/:id/evidence", async (req: Request, res: Response) => {
     if (t.rowCount !== 1) return res.status(404).json({ error: "not found" });
     const a = await pool.query("SELECT action, actor, actor_role, details, at FROM public.approval_audit WHERE ticket_id = $1 ORDER BY at", [req.params.id]);
     const ticket = t.rows[0];
-    const exp = ticket.mlflow_experiment_id || MLFLOW_EXPERIMENT_ID;
+    // APP-TRACE-VIEW-PREBUILD: the agent's 'created' audit row carries run_as / identity_mode / trace_id (grooming agent writes these).
+    const created = a.rows.find((r) => r.action === "created");
+    const createdDetails = (created?.details ?? {}) as Record<string, unknown>;
+    const traceId: string | null = ticket.trace_id || (typeof createdDetails.trace_id === "string" ? createdDetails.trace_id : null);
+    const exp: string = ticket.mlflow_experiment_id || MLFLOW_EXPERIMENT_ID;
+    // ML-GROOMING-FALLBACK-PATH: when no agent SP is recorded, the agent ran under a user identity.
+    const identityMode = ticket.agent_sp_name || ticket.agent_sp_app_id ? "service_principal" : "user_fallback";
     res.json({
       ticket,
       audit: a.rows,
-      agentIdentity: { name: ticket.agent_name, servicePrincipal: ticket.agent_sp_name, applicationId: ticket.agent_sp_app_id },
-      traceUrl: ticket.trace_id && exp ? `${HOST}/ml/experiments/${exp}/traces?selectedEvaluationId=${encodeURIComponent(ticket.trace_id)}` : null,
+      agentIdentity: {
+        name: ticket.agent_name,
+        servicePrincipal: ticket.agent_sp_name,
+        applicationId: ticket.agent_sp_app_id,
+        identityMode,
+        runAs: typeof createdDetails.run_as === "string" ? createdDetails.run_as : created?.actor ?? null,
+      },
+      traceId,
+      experimentId: exp || null,
+      traceUrl: traceId && exp ? `${HOST}/ml/experiments/${encodeURIComponent(exp)}/traces?selectedEvaluationId=${encodeURIComponent(traceId)}` : null,
     });
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });

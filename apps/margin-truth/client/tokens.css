@@ -54,6 +54,12 @@ td.num, th.num { text-align: right; }
 .llf-badge--pending { color: var(--llf-secondary); }
 .llf-badge--approved { color: var(--llf-positive); }
 .llf-badge--rejected { color: var(--llf-negative); }
+/* APP-TRACE-VIEW-PREBUILD: scene 6 evidence list (8px grid, muted labels) */
+.llf-evidence { display: grid; grid-template-columns: max-content 1fr; gap: var(--llf-space-1) var(--llf-space-2); margin: 0 0 var(--llf-space-2) 0; }
+.llf-evidence dt { color: var(--llf-muted); font-weight: 600; font-size: 13px; }
+.llf-evidence dd { margin: 0; }
+.llf-evidence a { color: var(--llf-primary-ink); }
+@media (max-width: 720px) { .llf-evidence { grid-template-columns: 1fr; } .llf-evidence dd { margin-bottom: var(--llf-space-1); } }
 .llf-genie { width: 100%; height: min(640px, 75vh); border: 1px solid var(--llf-border); border-radius: var(--llf-radius); }
 body, main { overflow-wrap: anywhere; }
 .llf-header h1 { min-width: 0; }
