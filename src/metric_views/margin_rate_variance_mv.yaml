@@ -1,0 +1,117 @@
+# Lakelink Fiber Margin Truth - metric view margin_rate_variance_mv v1.0 (ML-MV-OFFNET-RATE, @ml-engineer, 2026-11-13)
+# Deploy target: cdm_tmforum._metrics.margin_rate_variance_mv (DEC-001). NOT YET DEPLOYED: awaiting CEO confirmation of _metrics writes.
+# Deploy: CREATE VIEW ... WITH METRICS LANGUAGE YAML AS <dollar-quoted body without these # lines>; then SET TBLPROPERTIES ('telco_project'='margin_analysis').
+# Expected tests (raw SQL 2026-11-13): invoice_line_count 209,124; rate_variance 1,694,614.90 (= margin_ledger_mv carrier_rate_variance); paid_amount 959,602,431.58; overbilled_line_count 4,504.
+version: 1.1
+comment: >-
+  Lakelink Fiber carrier rate variance metrics. Grain: one carrier invoice line (vendor x off-net circuit x month).
+  Compares the agreed vendor contract rate, the invoiced rate and the amount paid. Positive variance = vendor overbilled.
+  Ties to margin_ledger_mv carrier_rate_variance. Synonyms: rate audit, overbilling, invoice variance.
+source: |-
+  SELECT ci.carrier_invoice_line_id, ci.invoice_number, ci.invoice_month, ci.vendor_id, v.vendor_name, v.vendor_type,
+         ci.circuit_id, ci.vendor_contract_rate_usd, ci.invoiced_rate_usd, ci.paid_amount_usd,
+         ci.extraction_method, ci.source_pdf_path
+  FROM cdm_tmforum.revenue_assurance.margin_carrier_invoices ci
+  LEFT JOIN cdm_tmforum.revenue_assurance.margin_vendors v ON v.vendor_id = ci.vendor_id
+dimensions:
+  - name: invoice_month
+    expr: invoice_month
+    display_name: Invoice Month
+    comment: "Carrier invoice period (first day of the month)."
+    format: {type: date, date_format: locale_short_month}
+    synonyms: [month, billing month, period]
+  - name: invoice_quarter
+    expr: DATE_TRUNC('QUARTER', invoice_month)
+    display_name: Invoice Quarter
+    comment: "Calendar quarter of the invoice month."
+    format: {type: date, date_format: year_month_day}
+    synonyms: [quarter]
+  - name: vendor_id
+    expr: vendor_id
+    display_name: Vendor ID
+    comment: "Third-party carrier that invoiced the circuit."
+    synonyms: [carrier id]
+  - name: vendor_name
+    expr: vendor_name
+    display_name: Vendor
+    comment: "Fictional third-party carrier name."
+    synonyms: [carrier, supplier, provider]
+  - name: vendor_type
+    expr: vendor_type
+    display_name: Vendor Type
+    comment: "Carrier type: wholesale or interconnect/CLEC."
+    synonyms: [carrier type]
+  - name: circuit_id
+    expr: circuit_id
+    display_name: Circuit ID
+    comment: "Off-net circuit the carrier charges for."
+    synonyms: [circuit]
+  - name: invoice_number
+    expr: invoice_number
+    display_name: Invoice Number
+    comment: "Carrier invoice number (one invoice per vendor per month)."
+    synonyms: [invoice]
+  - name: is_overbilled
+    expr: invoiced_rate_usd > vendor_contract_rate_usd
+    display_name: Overbilled
+    comment: "TRUE when the invoiced rate is above the agreed vendor contract rate."
+    synonyms: [rate variance flag, billed above contract]
+  - name: extraction_method
+    expr: extraction_method
+    display_name: Capture Method
+    comment: "ai_extract (parsed from the PDF) or structured (EDI/feed)."
+    synonyms: [source method]
+  - name: source_pdf_path
+    expr: source_pdf_path
+    display_name: Source PDF
+    comment: "Path of the carrier invoice PDF in volume margin_documents, when captured from a PDF."
+    synonyms: [invoice pdf]
+measures:
+  - name: contract_rate
+    expr: SUM(vendor_contract_rate_usd)
+    display_name: Contract Rate
+    comment: "Sum of agreed monthly vendor contract rates, US dollars."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [contracted carrier rate, agreed rate]
+  - name: invoiced_amount
+    expr: SUM(invoiced_rate_usd)
+    display_name: Invoiced
+    comment: "Sum of invoiced monthly rates, US dollars."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [billed by carrier, invoiced rate]
+  - name: paid_amount
+    expr: SUM(paid_amount_usd)
+    display_name: Paid
+    comment: "Amount Lakelink Fiber paid carriers, US dollars."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [paid, vendor payments]
+  - name: rate_variance
+    expr: MEASURE(invoiced_amount) - MEASURE(contract_rate)
+    display_name: Rate Variance
+    comment: "Invoiced minus contract rate, US dollars. Positive = vendor overbilled. Ties to margin_ledger_mv carrier_rate_variance."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [carrier rate variance, overbilling, invoice variance]
+  - name: overpayment
+    expr: MEASURE(paid_amount) - MEASURE(contract_rate)
+    display_name: Paid Above Contract
+    comment: "Paid minus contract rate, US dollars. Positive = Lakelink Fiber paid more than agreed (dispute candidate)."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [overpaid, dispute amount, recoverable]
+  - name: rate_variance_pct
+    expr: MEASURE(rate_variance) / NULLIF(MEASURE(contract_rate), 0)
+    display_name: Rate Variance %
+    comment: "Rate variance divided by contract rate (0.05 = 5%)."
+    format: {type: percentage, decimal_places: {type: exact, places: 2}}
+    synonyms: [variance percent]
+  - name: invoice_line_count
+    expr: COUNT(1)
+    display_name: Invoice Lines
+    comment: "Number of carrier invoice lines."
+    format: {type: number, decimal_places: {type: exact, places: 0}}
+    synonyms: [lines]
+  - name: overbilled_line_count
+    expr: COUNT(1) FILTER (WHERE is_overbilled)
+    display_name: Overbilled Lines
+    comment: "Invoice lines billed above the contract rate."
+    format: {type: number, decimal_places: {type: exact, places: 0}}
+    synonyms: [variance lines, disputed lines]

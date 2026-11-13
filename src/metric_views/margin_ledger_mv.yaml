@@ -1,6 +1,6 @@
-# Lakelink Fiber Margin Truth - metric view DRAFT v0.2 (P2-MV-YAML-DRAFT + QA-MV-COUNT-FORMAT, @data-analyst, 2026-11-12)
+# Lakelink Fiber Margin Truth - metric view v1.0 DEPLOYED (P2-MV-MARGIN-LEDGER, @data-analyst, 2026-11-13)
 # Deploy target: cdm_tmforum._metrics.margin_ledger_mv  (DEC-001, DEC-002)
-# Built against src/semantics/STANDARDS.md v1.0 (commit f9b2f65). NOT DEPLOYED: waits on P1-LEDGER-GOLD-FASTPATH.
+# Built against src/semantics/STANDARDS.md v1.0 (commit f9b2f65). Source = margin_ledger_allocated (live allocation, DEC-020). Canonical total CM 2,375,095,705.09 at default rules.
 # Deploy:  CREATE VIEW cdm_tmforum._metrics.margin_ledger_mv WITH METRICS LANGUAGE YAML AS $$ <this body> $$
 #          ALTER VIEW ... SET TAGS ('telco_project' = 'margin_analysis')
 # Later edits: ALTER VIEW ... AS $$ ... $$ (keeps grants), never CREATE OR REPLACE.
@@ -11,7 +11,7 @@ comment: >-
   Contribution margin = revenue - network expense - cost to serve (DEC-002), defined once here.
   Cost to serve is allocated by margin_allocation_rules, so a rule change moves every answer.
   Synonyms: margin ledger, P&L by circuit, profitability.
-source: cdm_tmforum.revenue_assurance.margin_ledger
+source: cdm_tmforum.revenue_assurance.margin_ledger_allocated
 
 dimensions:
   - name: ledger_month

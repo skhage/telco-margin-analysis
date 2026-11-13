@@ -1,0 +1,127 @@
+# Lakelink Fiber Margin Truth - metric view margin_offnet_spend_mv v1.0 (ML-MV-OFFNET-RATE, @ml-engineer, 2026-11-13)
+# Deploy target: cdm_tmforum._metrics.margin_offnet_spend_mv (DEC-001). NOT YET DEPLOYED: awaiting CEO confirmation of _metrics writes.
+# Deploy: CREATE VIEW ... WITH METRICS LANGUAGE YAML AS <dollar-quoted body without these # lines>; then SET TBLPROPERTIES ('telco_project'='margin_analysis').
+# Later edits: ALTER VIEW ... AS <body>. Expected tests: offnet_circuit_count 17,427; grooming_candidate_count 47; heroes 45040 (879.34) and 98532 (469.00).
+version: 1.1
+comment: >-
+  Lakelink Fiber off-net spend and grooming metrics. Grain: one row per off-net circuit (circuit rides a third-party vendor).
+  Monthly cost is the latest carrier invoice paid amount; estimated savings and score come from the UC function
+  cdm_tmforum.revenue_assurance.margin_score_onnet_move, the same function the off-net grooming agent calls.
+  Ops starter question: which off-net circuits run next to our own fiber, and what do we pay for them?
+  Contribution margin is NOT defined here; use margin_ledger_mv (DEC-002). Synonyms: grooming, off-net spend, vendor spend.
+source: |-
+  SELECT s.circuit_id, c.contract_id, c.customer_id, s.vendor_id, v.vendor_name, v.vendor_type,
+         c.bandwidth_mbps, c.route_description, s.is_parallel_to_onnet_fiber, s.onnet_distance_m,
+         s.monthly_offnet_cost_usd, s.est_monthly_savings_usd, s.score,
+         (s.is_parallel_to_onnet_fiber AND s.est_monthly_savings_usd > 0) AS is_grooming_candidate,
+         ci.trailing_12m_paid_usd
+  FROM cdm_tmforum.revenue_assurance.margin_score_onnet_move(NULL) s
+  JOIN cdm_tmforum.revenue_assurance.margin_circuits c ON c.circuit_id = s.circuit_id
+  LEFT JOIN cdm_tmforum.revenue_assurance.margin_vendors v ON v.vendor_id = s.vendor_id
+  LEFT JOIN (SELECT circuit_id, SUM(paid_amount_usd) AS trailing_12m_paid_usd
+             FROM cdm_tmforum.revenue_assurance.margin_carrier_invoices GROUP BY circuit_id) ci
+         ON ci.circuit_id = s.circuit_id
+dimensions:
+  - name: circuit_id
+    expr: circuit_id
+    display_name: Circuit ID
+    comment: "Off-net circuit identifier (TMF customer facing service id)."
+    synonyms: [circuit, service id, line]
+  - name: contract_id
+    expr: contract_id
+    display_name: Contract Line ID
+    comment: "Contract line that covers the circuit (Salesforce contract_line_item Id)."
+    synonyms: [contract, contract line]
+  - name: customer_id
+    expr: customer_id
+    display_name: Customer ID
+    comment: "Lakelink Fiber customer that owns the circuit."
+    synonyms: [account, customer]
+  - name: vendor_id
+    expr: vendor_id
+    display_name: Vendor ID
+    comment: "Third-party carrier the circuit rides (Salesforce partner_account Id, DEC-003)."
+    synonyms: [carrier id, supplier id]
+  - name: vendor_name
+    expr: vendor_name
+    display_name: Vendor
+    comment: "Fictional third-party carrier name."
+    synonyms: [carrier, supplier, provider]
+  - name: vendor_type
+    expr: vendor_type
+    display_name: Vendor Type
+    comment: "Carrier type: wholesale or interconnect/CLEC."
+    synonyms: [carrier type]
+  - name: bandwidth_mbps
+    expr: bandwidth_mbps
+    display_name: Bandwidth (Mbps)
+    comment: "Nominal circuit bandwidth in megabits per second."
+    synonyms: [speed, capacity]
+  - name: route_description
+    expr: route_description
+    display_name: Route
+    comment: "Plain-language description of the circuit path."
+    synonyms: [path, route]
+  - name: is_parallel_to_onnet_fiber
+    expr: is_parallel_to_onnet_fiber
+    display_name: Runs Next to Own Fiber
+    comment: "TRUE when the off-net circuit runs next to Lakelink Fiber fiber."
+    synonyms: [adjacent fiber, parallel to our fiber, next to our fiber]
+  - name: onnet_distance_m
+    expr: onnet_distance_m
+    display_name: Distance to Own Fiber (m)
+    comment: "Meters from the circuit route to the nearest Lakelink Fiber fiber."
+    synonyms: [distance to fiber]
+  - name: is_grooming_candidate
+    expr: is_grooming_candidate
+    display_name: Grooming Candidate
+    comment: "TRUE when the circuit runs next to own fiber AND estimated monthly savings > 0. Same filter as the grooming agent and the Ops benchmark (DEC-017)."
+    synonyms: [move on-net candidate, groomable, grooming target]
+  - name: score
+    expr: score
+    display_name: On-net Move Score
+    comment: "0-100 score from margin_score_onnet_move: 50 for running next to own fiber plus up to 50 for savings as a share of cost."
+    synonyms: [grooming score, priority score]
+measures:
+  - name: offnet_circuit_count
+    expr: COUNT(DISTINCT circuit_id)
+    display_name: Off-net Circuits
+    comment: "Number of distinct off-net circuits."
+    format: {type: number, decimal_places: {type: exact, places: 0}}
+    synonyms: [off-net circuits, leased circuits]
+  - name: grooming_candidate_count
+    expr: COUNT(DISTINCT circuit_id) FILTER (WHERE is_grooming_candidate)
+    display_name: Grooming Candidates
+    comment: "Off-net circuits next to own fiber with positive estimated savings (DEC-017 Ops benchmark)."
+    format: {type: number, decimal_places: {type: exact, places: 0}}
+    synonyms: [groomable circuits, move on-net candidates]
+  - name: monthly_offnet_cost
+    expr: SUM(monthly_offnet_cost_usd)
+    display_name: Monthly Off-net Cost
+    comment: "Latest-month amount paid to the carrier, US dollars per month."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [what we pay, vendor cost, monthly vendor spend]
+  - name: trailing_12m_offnet_paid
+    expr: SUM(trailing_12m_paid_usd)
+    display_name: Off-net Paid (12 months)
+    comment: "Total paid to carriers over the 12 invoice months on file (Nov 2025 - Oct 2026), US dollars. Ties to margin_ledger_mv offnet_network_expense."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [annual vendor spend, off-net spend]
+  - name: est_monthly_savings
+    expr: SUM(est_monthly_savings_usd) FILTER (WHERE is_grooming_candidate)
+    display_name: Est. Monthly Savings
+    comment: "Estimated monthly savings from moving grooming candidates on-net, US dollars. Only candidates are summed; raw savings can be negative on high-bandwidth circuits."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [grooming savings, on-net savings, savings]
+  - name: est_annual_savings
+    expr: MEASURE(est_monthly_savings) * 12
+    display_name: Est. Annual Savings
+    comment: "Estimated monthly savings x 12, US dollars."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [annualized savings, yearly savings]
+  - name: candidate_monthly_cost
+    expr: SUM(monthly_offnet_cost_usd) FILTER (WHERE is_grooming_candidate)
+    display_name: Candidate Monthly Cost
+    comment: "Monthly carrier cost of the grooming candidates only, US dollars."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [groomable spend]
