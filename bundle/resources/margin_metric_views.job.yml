@@ -1,7 +1,7 @@
 # Lakelink Fiber - Margin Truth: job that deploys margin_ metric views from src/metric_views/*.yaml
 # into the EXISTING schema ${var.catalog}.${var.metrics_schema} (DEVOPS-BUNDLE-LIVE-ASSETS).
-# Live today: margin_ledger_mv (DEC-002, DEC-020). Other MVs (P2-MV-SUITE, DEC-022) are added to
-# --views by @data-analyst once deployed. Default is a DRY RUN; to deploy for real:
+# Live (P2-MV-SUITE, DEC-022): margin_ledger_mv, margin_offnet_spend_mv, margin_segment_growth_mv,
+# margin_renewal_floor_mv, margin_onebillion_wall_mv. margin_rate_variance_mv is STRETCH (DEC-007). Default is a DRY RUN; to deploy for real:
 #   databricks bundle run margin_metric_views_job --python-params "--views,margin_ledger_mv,--execute"
 # Existing views are ALTERed (keeps grants), never CREATE OR REPLACE. Never creates schemas.
 resources:
@@ -29,3 +29,7 @@ resources:
               - ${var.project_tag}
               - --views
               - margin_ledger_mv
+              - margin_offnet_spend_mv
+              - margin_segment_growth_mv
+              - margin_renewal_floor_mv
+              - margin_onebillion_wall_mv

@@ -20,7 +20,14 @@ import sys
 
 DEFAULT_CATALOG = "cdm_tmforum"
 DEFAULT_METRICS_SCHEMA = "_metrics"
-DEFAULT_VIEWS = ["margin_ledger_mv"]
+# Live in cdm_tmforum._metrics (DEC-022). margin_rate_variance_mv is STRETCH (DEC-007): pass it via --views.
+DEFAULT_VIEWS = [
+    "margin_ledger_mv",
+    "margin_offnet_spend_mv",
+    "margin_segment_growth_mv",
+    "margin_renewal_floor_mv",
+    "margin_onebillion_wall_mv",
+]
 IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 HERE = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
 
@@ -78,10 +85,19 @@ def main(argv=None) -> int:
         return 0
 
     sp = get_spark()
-    if sp.sql(f"SHOW SCHEMAS IN `{cat}` LIKE '{sch}'").count() == 0:
+    # DEVOPS-FIX-MV-DEPLOYER: SHOW SCHEMAS LIKE / SHOW VIEWS IN raise
+    # CROSS_CATALOG_SCHEMA_REFERENCE_NOT_SUPPORTED on serverless; use the catalog's information_schema.
+    info = f"`{cat}`.information_schema"
+    if sp.sql(f"SELECT 1 FROM {info}.schemata WHERE schema_name = :s", args={"s": sch}).count() == 0:
         print(f"schema {cat}.{sch} does not exist; refusing to create it (directive 1)")
         return 1
-    existing = {r["tableName"] for r in sp.sql(f"SHOW VIEWS IN `{cat}`.`{sch}`").collect()}
+    existing = {
+        r["table_name"]
+        for r in sp.sql(
+            f"SELECT table_name FROM {info}.tables WHERE table_schema = :s AND table_type IN ('VIEW', 'METRIC_VIEW')",
+            args={"s": sch},
+        ).collect()
+    }
     for n, body in plan:
         fq = f"`{cat}`.`{sch}`.`{n}`"
         if n in existing:
