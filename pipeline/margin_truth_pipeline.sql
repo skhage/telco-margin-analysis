@@ -3,13 +3,18 @@
 -- Target: cdm_tmforum.revenue_assurance (no new schemas)
 -- Layers: Bronze (Auto Loader) → Silver (ai_parse/ai_extract) → Gold (margin_ledger)
 -- Tag: telco_project = margin_analysis
--- Task: P1-SDP-PIPELINE
+-- Task: P1-SDP-PIPELINE (column COMMENTs added 2026-11-13 for QA-F-PIPELINE-COMMENTS; 100% columns)
 -- ============================================================
 
 -- ============================================================
 -- BRONZE: Auto Loader ingests carrier invoice PDFs
 -- ============================================================
-CREATE OR REFRESH STREAMING TABLE margin_bronze_invoice_docs
+CREATE OR REFRESH STREAMING TABLE margin_bronze_invoice_docs (
+  path STRING COMMENT 'Full UC volume path of the carrier invoice PDF (file name = <invoice_number>_CKT-<circuit_id>.pdf). Lineage key from silver and ledger back to the source document. Synonyms: file path, document path, source pdf.',
+  content BINARY COMMENT 'Raw binary bytes of the carrier invoice PDF as read by Auto Loader (binaryFile format). Input to ai_parse_document in margin_silver_invoice_parsed. Synonyms: file content, pdf bytes.',
+  length BIGINT COMMENT 'Size of the PDF file in bytes. Synonyms: file size.',
+  modificationTime TIMESTAMP COMMENT 'Last modified timestamp of the PDF file in the volume (UTC). Used by Auto Loader for incremental ingest. Synonyms: file timestamp, landed at.'
+)
 COMMENT 'Raw carrier invoice PDFs ingested via Auto Loader from the margin_documents UC volume. Grain: one row per PDF file. Source: /Volumes/cdm_tmforum/revenue_assurance/margin_documents/carrier_invoices/'
 TBLPROPERTIES ('telco_project' = 'margin_analysis')
 AS SELECT
@@ -25,7 +30,10 @@ FROM STREAM(read_files(
 -- ============================================================
 -- SILVER: Parse and extract structured fields from invoice PDFs
 -- ============================================================
-CREATE OR REFRESH MATERIALIZED VIEW margin_silver_invoice_parsed
+CREATE OR REFRESH MATERIALIZED VIEW margin_silver_invoice_parsed (
+  path STRING COMMENT 'Full UC volume path of the source carrier invoice PDF; joins to margin_bronze_invoice_docs.path and margin_carrier_invoices.source_pdf_path. Synonyms: document path, source pdf.',
+  extracted VARIANT COMMENT 'VARIANT of fields extracted by ai_extract from the parsed PDF: invoice_number, vendor_name, circuit_id, invoice_month (YYYY-MM), invoiced_rate_usd, vendor_contract_rate_usd, paid_amount_usd (US dollars). Synonyms: parsed invoice fields, extracted fields.'
+)
 COMMENT 'Parsed carrier invoice PDFs with structured fields extracted via ai_parse_document and ai_extract. Grain: one row per PDF. Enables scene 2 lineage trace from ledger back to source document.'
 TBLPROPERTIES ('telco_project' = 'margin_analysis')
 AS
@@ -64,6 +72,29 @@ FROM parsed;
 --   revenue_not_null: revenue_usd IS NOT NULL (WARN)
 -- ============================================================
 CREATE OR REFRESH MATERIALIZED VIEW margin_ledger_v2 (
+  ledger_month DATE COMMENT 'Ledger month, first day of the month. Part of the primary key. Synonyms: month, period, fiscal month.',
+  customer_id BIGINT COMMENT 'Lakelink Fiber customer (TMF customer id). Part of the primary key; references margin_customers. Synonyms: account, customer number.',
+  product_id STRING COMMENT 'Product of the contract line (Salesforce product2 Id or MGN-PRD- synthetic legacy voice id). Part of the primary key; references margin_products. Synonyms: product, sku.',
+  circuit_id BIGINT COMMENT 'Circuit (TMF customer facing service id). Part of the primary key; references margin_circuits. Synonyms: circuit, service id.',
+  contract_id STRING COMMENT 'Contract line that bills this circuit (Salesforce contract_line_item Id); references margin_contracts. Synonyms: contract, contract line.',
+  vendor_id STRING COMMENT 'Third-party carrier the circuit rides when off-net; NULL when on-net. References margin_vendors. Synonyms: carrier, supplier.',
+  is_on_net BOOLEAN COMMENT 'TRUE = circuit rides the Lakelink Fiber network; FALSE = off-net on a third-party vendor. Synonyms: on-net flag, own network.',
+  product_family STRING COMMENT 'Product family: Dedicated Internet, Wavelength, Ethernet, IP-VPN, Managed, Colocation, Legacy Voice. Synonyms: family, product line.',
+  family_class STRING COMMENT 'strategic or legacy, from the product family (legacy = IP-VPN and Legacy Voice). Synonyms: legacy vs strategic, legacy family, strategic family.',
+  segment STRING COMMENT 'Customer segment: Strategic Enterprise, Enterprise, Commercial, Small Business. Synonyms: market segment, customer tier.',
+  region STRING COMMENT 'Sales region of the customer. Synonyms: territory, geography.',
+  revenue_usd DECIMAL(18,2) COMMENT 'Billed revenue for the circuit in the month, US dollars (margin_billing.billed_amount_usd). Synonyms: sales, billings, top line.',
+  network_expense_usd DECIMAL(18,2) COMMENT 'Network cost for the circuit in the month, US dollars. Off-net = carrier paid amount; on-net = contract rate x 0.25 (strategic) or x 0.60 (legacy). Synonyms: network cost, access cost.',
+  cost_to_serve_usd DECIMAL(18,2) COMMENT 'Baseline operating cost allocated by margin_allocation_rules version MGN-ALR-v1 (GL cost-to-serve pool x driver share x weight), US dollars. Live rule changes are applied at query time in margin_ledger_allocated. Synonyms: CTS, servicing cost.',
+  expected_revenue_usd DECIMAL(18,2) COMMENT 'Revenue the contract rate says should have been billed, US dollars. Expected minus revenue = revenue leakage. Synonyms: contracted revenue, should-bill.',
+  carrier_rate_variance_usd DECIMAL(18,2) COMMENT 'Carrier invoiced rate minus agreed vendor contract rate, US dollars; 0 on-net or with no carrier invoice. Positive = vendor overbilled. Synonyms: rate variance, overbilling.',
+  circuit_count INT COMMENT 'Allocation driver: always 1 (one circuit per ledger row). Used by circuit_count rules. Synonyms: circuits.',
+  bandwidth_mbps DECIMAL(12,2) COMMENT 'Allocation driver: nominal circuit bandwidth in megabits per second (margin_circuits.bandwidth_mbps). Used by bandwidth_mbps rules.',
+  ticket_count INT COMMENT 'Allocation driver: trouble tickets for the circuit in the month. Synthetic proxy for customer care tickets (DEC-016): deterministic, legacy avg 1.5 and strategic avg 0.25 per month, because the real ticket source has too few tickets in the ledger window. Drives the customer_care cost pool via ticket_count rules in margin_allocation_rules. Synonyms: tickets, trouble tickets, care tickets.',
+  billed_revenue_usd DECIMAL(18,2) COMMENT 'Allocation driver: billed revenue in US dollars, same value as revenue_usd. Used by billed_revenue rules.',
+  allocation_rule_version STRING COMMENT 'Allocation rule set used for cost_to_serve_usd (MGN-ALR-v1 = active margin_allocation_rules at build time). Synonyms: rule set.',
+  origin STRING COMMENT 'Data origin: MIXED (real Salesforce/TMF keys with synthetic amounts and drivers).',
+  source_system STRING COMMENT 'Build that produced the row: margin_sdp_pipeline (Lakeflow Spark Declarative Pipeline gold, same logic as the margin_fastpath_sql fast path, DEC-008/DEC-023).',
   CONSTRAINT pk_not_null EXPECT (ledger_month IS NOT NULL AND customer_id IS NOT NULL AND product_id IS NOT NULL AND circuit_id IS NOT NULL) ON VIOLATION FAIL UPDATE,
   CONSTRAINT no_carrier_overcharge EXPECT (carrier_rate_variance_usd <= 0),
   CONSTRAINT billed_revenue_present EXPECT (revenue_usd > 0),
