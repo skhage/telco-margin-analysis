@@ -1,16 +1,17 @@
 # Genie One Instructions Proposal: Lakelink Fiber Margin Truth
 
-Owner: @data-planner · Task: DP-GENIE-ONE-FALLBACK · Status: DRAFT v1.0 (2026-11-13) · Company: Lakelink Fiber (fictional) · telco_project = margin_analysis
+Owner: @data-planner (v1.0), @data-analyst (v1.1) · Tasks: DP-GENIE-ONE-FALLBACK, P3-GENIE-ONE-READINESS · Status: DRAFT v1.1 (2026-11-13) · Company: Lakelink Fiber (fictional) · telco_project = margin_analysis
 
 This is a PROPOSAL only. The CEO must approve it before anything is copied into `/Workspace/.genie_workspace_instructions.md`. No agent edits that file.
 
-Why this exists: Discover Domains and UC Glossary Pages are blocked by the account domain quota (HTTP 429, 1000 domains, gate DP-ESC-DOMAIN-QUOTA, cutoff Nov 15 12:00 CT per DEC-018). Until that clears, Genie One finds the margin assets through (a) table, column and metric view comments, (b) Margin Genie instructions, and (c) this proposed workspace instruction block.
+Why this exists: Genie One finds the margin assets through (a) certified metric views with full comments, (b) the Discover domain `lakelink_margin` (2abc9194-aed9-4088-bfa6-4b4d33870ebd) and its 16 Glossary Pages (DRAFT), (c) Margin Genie, and (d) this proposed workspace instruction block. v1.1 note: the domain quota gate cleared on 2026-11-13 (@pm run #9), and all 5 margin_ metric views are live and certified.
 
 ## 1. Proposed block for /Workspace/.genie_workspace_instructions.md (CEO approval required)
 
 ```
 ## Lakelink Fiber margin and profitability (Margin Truth)
-- For questions about margin, contribution margin, profitability, cost to serve, losing products or circuits, off-net or on-net circuits, renewals below the margin floor, revenue leakage, carrier rate variance, grooming, or the $1B Wall, use the Margin Genie agent (Lakelink Fiber Margin Genie) or the metric view cdm_tmforum._metrics.margin_ledger_mv.
+- For questions about margin, contribution margin, profitability, cost to serve, losing products or circuits, off-net or on-net circuits, renewals below the margin floor, revenue leakage, carrier rate variance, grooming, or the $1B Wall, use the Margin Genie agent (Lakelink Fiber Margin Genie) or the certified metric views in cdm_tmforum._metrics with prefix margin_: margin_ledger_mv (contribution margin, all personas), margin_offnet_spend_mv (Ops: off-net spend and grooming candidates, is_grooming_candidate), margin_renewal_floor_mv (Sales: is_renewal_next_90d AND is_below_floor), margin_segment_growth_mv (Marketing: room_to_grow), margin_onebillion_wall_mv ($1B Wall levers).
+- "Last quarter" means the last full calendar quarter before the demo as-of date 2026-11-19 (2026 Q3, Jul-Sep). "Next 90 days" means term_end between 2026-11-19 and 2026-11-19 + 90 days, never CURRENT_DATE.
 - Contribution margin = revenue - network expense - cost to serve. It is defined ONCE as the measure contribution_margin in cdm_tmforum._metrics.margin_ledger_mv. Always query it with MEASURE(contribution_margin). Never recompute it from columns, and never add your own cost to serve.
 - Legacy vs strategic follows margin_products.family_class (legacy = IP-VPN and Legacy Voice; all others strategic).
 - Off-net means the circuit rides a third-party carrier (is_on_net = FALSE, vendor_id NOT NULL). On-net means it rides Lakelink Fiber's own fiber.
@@ -20,18 +21,19 @@ Why this exists: Discover Domains and UC Glossary Pages are blocked by the accou
 
 ## 2. Assets to certify once validated
 
-Certify only after the stated check passes. Status checked 2026-11-13 by SQL on information_schema.
+Status re-checked 2026-11-13 by @data-analyst (P3-GENIE-ONE-READINESS) by SQL on cdm_tmforum.information_schema and the Genie API.
 
-| Asset | Exists (2026-11-13) | Certify when |
+| Asset | State (2026-11-13) | Certified |
 |---|---|---|
-| `cdm_tmforum._metrics.margin_ledger_mv` | NO (P2-MV-MARGIN-LEDGER open) | P2-MV-VALIDATION: MEASURE(contribution_margin) = raw SQL (baseline total 2,375,095,704.83 at MGN-ALR-v1) |
-| `cdm_tmforum._metrics.margin_segment_growth_mv` | NO | DEC-013 definition matches raw SQL |
-| `cdm_tmforum.revenue_assurance.margin_ledger` | YES (gold, 517,032 rows) | GL tie-out within 0.5% (already shown by @qa/@data-analyst) |
-| `margin_customers`, `margin_products`, `margin_contracts`, `margin_circuits`, `margin_vendors` | YES | PK/FK present (P1-PK-FK-ONTOLOGY) |
-| `margin_billing`, `margin_carrier_invoices`, `margin_gl_actuals`, `margin_allocation_rules` | YES | Comments 100% (verified: 0 uncommented columns on all 10 margin_ tables) |
-| Margin Genie agent | NO (P3-MARGIN-GENIE) | 4 persona benchmarks pass (DEC-017) |
-| AI/BI dashboard Lakelink Fiber Margin Truth | NO (P3-DASHBOARD) | Tiles equal metric view values |
-| App lakelink-margin-truth | YES | Explorer numbers equal metric view |
+| `cdm_tmforum._metrics.margin_ledger_mv` | Live; 25/25 fields commented; MEASURE(contribution_margin) = 2,375,095,705.09 = raw SQL on margin_ledger_allocated | YES (system.certification_status = certified, set by @data-analyst after @qa P2-MV-VALIDATION) |
+| `margin_offnet_spend_mv` | Live; 19/19 commented; 47 grooming candidates = raw function check | YES |
+| `margin_renewal_floor_mv` | Live; 22/22 commented; 586 below floor = raw SQL (DEC-019) | YES |
+| `margin_segment_growth_mv` | Live; 10/10 commented; room_to_grow = Commercial only = raw SQL (DEC-013) | YES |
+| `margin_onebillion_wall_mv` | Live; 9/9 commented | YES |
+| `margin_` tables in revenue_assurance | Live, commented, PK/FK | Not yet (owner @data-planner) |
+| Margin Genie 01f1df115a08164aab3ae5f6faac807c | Live; 13 benchmarks; 4 starter questions answer correctly (section 6) | n/a |
+| Dashboard 01f1df1950c51bd68e87ace31632c2bf | Live (ONE dashboard) | n/a |
+| Tags | All 5 MVs carry telco_project = margin_analysis as TBLPROPERTIES; the UC entity-tag API returned no telco_project tag | - |
 
 ## 3. Glossary text (16 terms) for comments, MV synonyms and Margin Genie instructions
 
@@ -54,7 +56,7 @@ Source of truth: `src/semantics/glossary_pages.json` v1.0. Coverage column = whe
 | Revenue Leakage | Expected revenue minus billed revenue; positive = under-billing | leakage, billing gap | margin_ledger.expected_revenue_usd, margin_billing | Yes |
 | Rate Variance | Carrier invoiced rate minus contracted vendor rate; positive = overbilled | overbilling, invoice variance | margin_ledger.carrier_rate_variance_usd | Yes |
 | Grooming | Moving an off-net circuit next to Lakelink fiber onto the own network; scored by margin_score_onnet_move | circuit grooming, on-net migration | margin_circuits.is_parallel_to_onnet_fiber, UC function | Yes (column comment + margin_score_onnet_move function comment names the grooming agent) |
-| $1B Wall | Target of USD 1,000,000,000 annualized margin improvement, tracked by lever | billion dollar wall, margin improvement target | Dashboard $1B Wall page, margin_ledger_mv | No (no asset yet) |
+| $1B Wall | Target of USD 1,000,000,000 annualized margin improvement, tracked by lever | billion dollar wall, margin improvement target | margin_onebillion_wall_mv, dashboard $1B Wall page | Yes (margin_onebillion_wall_mv comment) |
 
 ## 4. Canonical persona answers Genie One must route to (DEC-017)
 
@@ -63,8 +65,22 @@ Source of truth: `src/semantics/glossary_pages.json` v1.0. Coverage column = whe
 * Sales: term_end within 90 days of the demo as-of date AND cm_pct from margin_ledger_mv < margin_products.margin_floor_pct.
 * Marketing: DEC-013 room to grow (cm_pct above portfolio average AND revenue share below customer-count share), margin_segment_growth_mv.
 
-## 5. Remaining gaps (filed as tasks)
+## 5. Remaining gaps (v1.1)
 
-* MV metadata: every measure/dimension in margin_ledger_mv needs comment, display name, format, synonyms from section 3 (DP-MV-GLOSSARY-FIELDS, @data-analyst).
-* margin_circuits table comment says "12 off-net 1G circuits"; under DEC-017 12 is a sub-view and the Ops hero count is defined by the score filter. Comment must not state a conflicting hero count (DP-FIX-CIRCUITS-COMMENT-HERO, @data-engineer).
-* $1B Wall and Grooming definitions must appear in Margin Genie instructions (DP-GENIE-GLOSSARY-INSTR, @data-analyst).
+* CEO approval of the section 1 block before anyone edits `/Workspace/.genie_workspace_instructions.md` (filed: PM-GENIE-ONE-CEO-CAPTURE, @pm).
+* Genie One itself cannot be driven by API (no REST endpoint for the workspace chat). The 4 questions must be asked once interactively in Genie One by the CEO, with screenshots, and compared with section 6. If that hasn't happened by Nov 14 18:00 UTC, the demo uses Margin Genie only (@pm handoff note 559).
+* Glossary Pages are still DRAFT (DP-GLOSSARY-CERTIFY, @data-planner).
+* Closed since v1.0: MV metadata (DP-MV-GLOSSARY-FIELDS), $1B Wall and Grooming in Margin Genie instructions (verified in text_instructions on 2026-11-13).
+
+## 6. Expected answers for the Genie One capture (verified 2026-11-13)
+
+Each value was verified twice: by raw SQL on `margin_ledger_allocated` and the base tables, and live in Margin Genie (conversation API, all 4 COMPLETED, about 25 s in parallel, each SQL on MEASURE() over a margin_ MV).
+
+| Persona | Question | Expected answer |
+|---|---|---|
+| Finance | Which product families lost money after cost to serve last quarter? | 2 families in 2026 Q3: IP-VPN -6,715,475.88 and Legacy Voice -249,532.74 (both legacy). Q3 portfolio CM 590,767,062.41 |
+| Ops | Which off-net circuits run next to our own fiber, and what do we pay for them? | 47 grooming candidates (Margin Genie row count 47); estimated savings 412,539.96 per year (raw function check) |
+| Sales | Which renewals in the next 90 days are below the margin floor? | 586 below floor out of 1,490 renewals (1,377 with ledger rows), as of 2026-11-19 |
+| Marketing | Which segments have the highest margin and the most room to grow? | Commercial: CM 54.35% vs portfolio 54.14%, revenue share 34.43% below customer share 34.46%. The only segment with room to grow |
+
+Portfolio contribution margin = 2,375,095,705.09 (DEC-020).

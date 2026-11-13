@@ -72,10 +72,10 @@ FROM parsed;
 --   revenue_not_null: revenue_usd IS NOT NULL (WARN)
 -- ============================================================
 CREATE OR REFRESH MATERIALIZED VIEW margin_ledger_v2 (
-  ledger_month DATE COMMENT 'Ledger month, first day of the month. Part of the primary key. Synonyms: month, period, fiscal month.',
-  customer_id BIGINT COMMENT 'Lakelink Fiber customer (TMF customer id). Part of the primary key; references margin_customers. Synonyms: account, customer number.',
-  product_id STRING COMMENT 'Product of the contract line (Salesforce product2 Id or MGN-PRD- synthetic legacy voice id). Part of the primary key; references margin_products. Synonyms: product, sku.',
-  circuit_id BIGINT COMMENT 'Circuit (TMF customer facing service id). Part of the primary key; references margin_circuits. Synonyms: circuit, service id.',
+  ledger_month DATE NOT NULL COMMENT 'Ledger month, first day of the month. Part of the primary key. Synonyms: month, period, fiscal month.',
+  customer_id BIGINT NOT NULL COMMENT 'Lakelink Fiber customer (TMF customer id). Part of the primary key; references margin_customers. Synonyms: account, customer number.',
+  product_id STRING NOT NULL COMMENT 'Product of the contract line (Salesforce product2 Id or MGN-PRD- synthetic legacy voice id). Part of the primary key; references margin_products. Synonyms: product, sku.',
+  circuit_id BIGINT NOT NULL COMMENT 'Circuit (TMF customer facing service id). Part of the primary key; references margin_circuits. Synonyms: circuit, service id.',
   contract_id STRING COMMENT 'Contract line that bills this circuit (Salesforce contract_line_item Id); references margin_contracts. Synonyms: contract, contract line.',
   vendor_id STRING COMMENT 'Third-party carrier the circuit rides when off-net; NULL when on-net. References margin_vendors. Synonyms: carrier, supplier.',
   is_on_net BOOLEAN COMMENT 'TRUE = circuit rides the Lakelink Fiber network; FALSE = off-net on a third-party vendor. Synonyms: on-net flag, own network.',
@@ -98,9 +98,16 @@ CREATE OR REFRESH MATERIALIZED VIEW margin_ledger_v2 (
   CONSTRAINT pk_not_null EXPECT (ledger_month IS NOT NULL AND customer_id IS NOT NULL AND product_id IS NOT NULL AND circuit_id IS NOT NULL) ON VIOLATION FAIL UPDATE,
   CONSTRAINT no_carrier_overcharge EXPECT (carrier_rate_variance_usd <= 0),
   CONSTRAINT billed_revenue_present EXPECT (revenue_usd > 0),
-  CONSTRAINT revenue_not_null EXPECT (revenue_usd IS NOT NULL)
+  CONSTRAINT revenue_not_null EXPECT (revenue_usd IS NOT NULL),
+  -- Informational PK/FK (DP-F-LEDGER-V2-PKFK): parity with margin_ledger for the Genie ontology
+  CONSTRAINT margin_ledger_v2_pk PRIMARY KEY (ledger_month, customer_id, product_id, circuit_id),
+  CONSTRAINT margin_ledger_v2_customer_fk FOREIGN KEY (customer_id) REFERENCES cdm_tmforum.revenue_assurance.margin_customers (customer_id),
+  CONSTRAINT margin_ledger_v2_product_fk  FOREIGN KEY (product_id)  REFERENCES cdm_tmforum.revenue_assurance.margin_products (product_id),
+  CONSTRAINT margin_ledger_v2_circuit_fk  FOREIGN KEY (circuit_id)  REFERENCES cdm_tmforum.revenue_assurance.margin_circuits (circuit_id),
+  CONSTRAINT margin_ledger_v2_contract_fk FOREIGN KEY (contract_id) REFERENCES cdm_tmforum.revenue_assurance.margin_contracts (contract_id),
+  CONSTRAINT margin_ledger_v2_vendor_fk   FOREIGN KEY (vendor_id)   REFERENCES cdm_tmforum.revenue_assurance.margin_vendors (vendor_id)
 )
-COMMENT 'Lakelink Fiber margin ledger (gold, pipeline build). Same schema and logic as fast-path margin_ledger (DEC-008). Rename to margin_ledger after dropping the fast-path table. Grain: customer x product x circuit x month. Source: margin_billing, margin_carrier_invoices, margin_contracts, margin_circuits, margin_products, margin_customers, margin_gl_actuals, margin_allocation_rules.'
+COMMENT 'Lakelink Fiber margin ledger (gold, pipeline build). Same schema and logic as fast-path margin_ledger (DEC-008); canonical source of margin_ledger_allocated since the DEC-023 repoint (no drop, no rename). For margin answers use metric view cdm_tmforum._metrics.margin_ledger_mv; contribution margin is defined only there (DEC-002). Do not SUM raw columns here. Grain: customer x product x circuit x month. Source: margin_billing, margin_carrier_invoices, margin_contracts, margin_circuits, margin_products, margin_customers, margin_gl_actuals, margin_allocation_rules.'
 TBLPROPERTIES ('telco_project' = 'margin_analysis')
 AS
 WITH base AS (

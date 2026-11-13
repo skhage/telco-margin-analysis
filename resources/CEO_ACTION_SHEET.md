@@ -7,10 +7,11 @@ Owner: @pm. Created 2026-11-13 06:10 UTC (COO-Q-20261113-25). This file is the C
 | 1 | App SP GRANTs (P3-APP-SCAFFOLD) | S5 approval app | Run SQL A below on app Lakebase project telco-margin-analysis-app (endpoint ep-calm-king-d2mq878u), database databricks_postgres | 3 min | Nov 15 12:00 CT -> recorded scene 5 |
 | 2 | App redeploy (after gate 1) | S5 | Reply "approve redeploy" in an @app-developer run, or in the Apps UI click Deploy on lakelink-margin-truth (source apps/margin-truth) | 2 min | Nov 16 12:00 CT -> dashboard explorer page |
 | 3 | Agent SP (P4-GATEWAY-SP-TRACING) | S6 identity | Command B below (create SP lakelink-margin-grooming-agent + grants) | 4 min | Nov 15 12:00 CT -> user-identity trace (ML-GROOMING-FALLBACK-PATH) |
-| 4 | Discover domain quota (DP-ESC-DOMAIN-QUOTA) | S1/S4 Genie One discoverability, Glossary Pages | Account admin: delete stale demo domains in Account console > Discover/Domains (quota 1000 reached, HTTP 429), or file a quota increase | 3 min | Nov 15 12:00 CT -> DP-GENIE-ONE-FALLBACK (table/MV comments + certified MV, no Domain/Pages) |
+| 4 | ~~Discover domain quota (DP-ESC-DOMAIN-QUOTA)~~ DONE 2026-11-13: domain 2abc9194-aed9-4088-bfa6-4b4d33870ebd verified by GET (@pm run #9). No CEO action. | - | - | - | - |
 | 5 | Genie One capture (PM-GENIE-ONE-CEO-CAPTURE) | S1/S4 Genie One claim | Steps C below (2 questions, 2 screenshots) | 3 min | Nov 14 18:00 UTC -> Margin Genie only on stage, no Genie One claim |
 | 6 | Delete TEST ticket (TEST-GROOM-4d4c099b0e) | S5 queue cleanliness | SQL D below on app Lakebase (optional: the UI filter APP-HIDE-TEST-TICKETS already hides it) | 1 min | Nov 16 12:00 CT -> UI filter (already built) |
 | 7 | @devops approval gate (DEVOPS-JOBS-ONLY-FALLBACK) | Leave-behind DAB | Reply "approve DEVOPS-JOBS-ONLY-FALLBACK" when a @devops run asks, or set the task in_progress on the board | 1 min | Nov 16 12:00 CT -> DAB shown as source in git only |
+| 8 | Delete stale pipeline (DE-DELETE-STALE-PIPELINE) | ONE-pipeline rule, S2 lineage clarity | In the Pipelines UI, delete pipeline ccea7e91-e657-4168-82fe-588f4e6437d5 (IDLE, owns 0 UC datasets; live pipeline is 20960984). Agent deletes are blocked by the safety guardrail. | 1 min | Nov 14 18:00 UTC -> ccea7e91 stays IDLE, excluded from demo, retire after demo (PM-STALE-PIPELINE-FALLBACK) |
 
 ## SQL A: app SP grants (gate 1)
 ```sql
@@ -42,6 +43,8 @@ DELETE FROM public.approval_tickets WHERE ticket_id = 'TEST-GROOM-4d4c099b0e';
 ```
 
 ## Scene readiness matrix (refreshed 2026-11-13 06:10 UTC, replaces COO-Q-20261113-21)
+
+Update 2026-11-13 @pm run #9: gate 4 closed; P2-GLOSSARY-PAGES and P2-DISCOVER-DOMAINS unblocked. COO review #15 reports Margin Genie with 9 sources (5 MVs + 4 dims) and 13/13 benchmarks passing, so S4 no longer waits on the MVs being added as Genie sources.
 
 | Scene | Status | Artifact / last verified | Open gate | Fallback trigger |
 | --- | --- | --- | --- | --- |
