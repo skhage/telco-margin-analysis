@@ -202,6 +202,10 @@ WHERE c.table_schema IN ('revenue_assurance','_metrics') AND c.table_name ILIKE 
   * `margin_ledger_mv` (12): customer_id, segment, region, product_id, product_family, family_class, contract_id, circuit_id, is_on_net, network_type, vendor_id, allocation_rule_version.
   * `margin_offnet_spend_mv` YAML: circuit_id, contract_id, customer_id, vendor_id, vendor_name, vendor_type, route_description, is_parallel_to_onnet_fiber, is_grooming_candidate are N/A. `bandwidth_mbps` (number), `onnet_distance_m` (number), and `score` (number, 2 decimals) are numeric and carry a format (added 2026-11-13).
   * `margin_rate_variance_mv` YAML (8): vendor_id, vendor_name, vendor_type, circuit_id, invoice_number, is_overbilled, extraction_method, source_pdf_path.
+  * `margin_renewal_floor_mv` (12, deployed, linted 2026-11-13 DP-LINT-SUITE-MVS): contract_id, customer_id, customer_name, segment, region, product_id, product_name, product_family, family_class, is_auto_renew, is_renewal_next_90d, is_below_floor.
+  * `margin_segment_growth_mv` (2, deployed, linted 2026-11-13): segment, room_to_grow.
+  * `margin_onebillion_wall_mv` (3, deployed, linted 2026-11-13): lever, owner_persona, source_metric.
+  * `margin_offnet_spend_mv` deployed lint 2026-11-13: the 9 N/A dims above are the only format gaps (19 fields).
 * Add any new ID/string/boolean dimension to this register in the same change that adds it.
 * Contribution margin is defined only in `margin_ledger_mv`; other views must not redefine it.
 
