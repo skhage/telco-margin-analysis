@@ -23,7 +23,7 @@ INSERT OVERWRITE cdm_tmforum.revenue_assurance.margin_sales_territory VALUES
 
 CREATE OR REPLACE FUNCTION cdm_tmforum.revenue_assurance.margin_sales_can_see(p_customer_id BIGINT, p_principal STRING, p_is_sales BOOLEAN)
 RETURNS BOOLEAN
-COMMENT 'Pure, testable visibility rule behind the Sales own-accounts row filter.'
+COMMENT 'Pure, testable visibility rule behind the Sales own-accounts row filter. telco_project=margin_analysis (DP-FN-TAG-COMMENT; UC functions cannot carry governed tags or TBLPROPERTIES).'
 RETURN NOT p_is_sales OR EXISTS (
   SELECT 1 FROM cdm_tmforum.revenue_assurance.margin_sales_territory t
   WHERE t.rep_principal = p_principal
@@ -31,12 +31,13 @@ RETURN NOT p_is_sales OR EXISTS (
 
 CREATE OR REPLACE FUNCTION cdm_tmforum.revenue_assurance.margin_sales_row_filter(p_customer_id BIGINT)
 RETURNS BOOLEAN
-COMMENT 'Row filter for margin_ tables: Sales (account group lakelink_margin_sales) sees only its own accounts; everyone else is unfiltered.'
+COMMENT 'Row filter for margin_ tables: Sales (account group lakelink_margin_sales) sees only its own accounts; everyone else is unfiltered. telco_project=margin_analysis (DP-FN-TAG-COMMENT; UC functions cannot carry governed tags or TBLPROPERTIES).'
 RETURN cdm_tmforum.revenue_assurance.margin_sales_can_see(p_customer_id, current_user(), is_account_group_member('lakelink_margin_sales'));
 
 ALTER TABLE cdm_tmforum.revenue_assurance.margin_ledger    SET ROW FILTER cdm_tmforum.revenue_assurance.margin_sales_row_filter ON (customer_id);
 ALTER TABLE cdm_tmforum.revenue_assurance.margin_customers SET ROW FILTER cdm_tmforum.revenue_assurance.margin_sales_row_filter ON (customer_id);
 ALTER TABLE cdm_tmforum.revenue_assurance.margin_contracts SET ROW FILTER cdm_tmforum.revenue_assurance.margin_sales_row_filter ON (customer_id);
+-- margin_ledger_v2 (SDP MV, pipeline 20960984) binds the same filter inline via WITH ROW FILTER in pipeline/margin_truth_pipeline.sql.
 
 -- Rollback:
 -- ALTER TABLE cdm_tmforum.revenue_assurance.margin_ledger    DROP ROW FILTER;

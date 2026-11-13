@@ -194,9 +194,11 @@ function MarginExplorer({ metricView, genieSpaceId }: { metricView: string; geni
   const [rows, setRows] = useState<ExplorerRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  // APP-EXPLORER-TOTAL-ROW: portfolio total comes from the server's ungrouped MEASURE() query, never summed here
+  const [total, setTotal] = useState<ExplorerRow | null>(null);
   useEffect(() => {
-    setRows(null); setError(null); setPending(false);
-    api<{ rows: ExplorerRow[] }>(`/api/explorer?dim=${dim}`).then((r) => setRows(r.rows))
+    setRows(null); setTotal(null); setError(null); setPending(false);
+    api<{ rows: ExplorerRow[]; total?: ExplorerRow | null }>(`/api/explorer?dim=${dim}`).then((r) => { setRows(r.rows); setTotal(r.total ?? null); })
       .catch((e) => (e.message === "pending_mv" ? setPending(true) : setError(e.message)));
   }, [dim]);
   const dimLabel = DIMENSIONS.find(([k]) => k === dim)?.[1] ?? dim;
@@ -231,6 +233,14 @@ function MarginExplorer({ metricView, genieSpaceId }: { metricView: string; geni
               <td className={`num ${Number(r.contribution_margin) < 0 ? "neg" : ""}`}>{fmtUsd(r.contribution_margin)}{Number(r.contribution_margin) < 0 ? " (loss)" : ""}</td>
               <td className="num">{fmtPct(r.cm_pct)}</td><td className="num">{orNA(r.circuits)}</td>
             </tr>))}</tbody>
+          {total && (
+            <tfoot><tr className="llf-total">
+              <th scope="row">Portfolio total</th><td className="num">{fmtUsd(total.revenue)}</td><td className="num">{fmtUsd(total.network_expense)}</td>
+              <td className="num">{fmtUsd(total.cost_to_serve)}</td>
+              <td className={`num ${Number(total.contribution_margin) < 0 ? "neg" : ""}`}>{fmtUsd(total.contribution_margin)}{Number(total.contribution_margin) < 0 ? " (loss)" : ""}</td>
+              <td className="num">{fmtPct(total.cm_pct)}</td><td className="num">{orNA(total.circuits)}</td>
+            </tr></tfoot>
+          )}
         </table></div>
       )}
     </section>

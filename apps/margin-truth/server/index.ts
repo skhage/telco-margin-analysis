@@ -110,6 +110,20 @@ GROUP BY ALL
 ORDER BY contribution_margin ASC`;
 }
 
+// APP-EXPLORER-TOTAL-ROW: portfolio total straight from the metric view (ungrouped MEASURE), never summed in the client (DEC-002/DEC-020).
+export function explorerTotalSql(): string {
+  if (!/^[a-z_]+\.[a-z_]+\.margin_[a-z_]+$/.test(MARGIN_MV)) throw new Error("bad metric view name");
+  return `SELECT
+  MEASURE(revenue) AS revenue,
+  MEASURE(network_expense) AS network_expense,
+  MEASURE(cost_to_serve) AS cost_to_serve,
+  MEASURE(contribution_margin) AS contribution_margin,
+  MEASURE(cm_pct) AS cm_pct,
+  MEASURE(circuit_count) AS circuits
+FROM ${MARGIN_MV}
+WHERE (:quarter = '' OR ledger_quarter = TRY_CAST(:quarter AS DATE))`;
+}
+
 // DSN-SCENE5-R1 item 4: vendor display names (fictional Lakelink-safe carrier names) from the governed vendor table.
 // Loaded once (30 rows), cached 10 min. If the warehouse or grant is unavailable, the UI falls back to the raw vendor_id.
 const MARGIN_VENDORS = process.env.MARGIN_VENDORS ?? "cdm_tmforum.revenue_assurance.margin_vendors";
@@ -255,8 +269,9 @@ app.get("/api/explorer", async (req: Request, res: Response) => {
   const quarter = String(req.query.quarter ?? "");
   try {
     if (!(await explorerReady())) return res.status(503).json({ error: "pending_mv", metricView: MARGIN_MV });
-    const rows = await runSql(explorerSql(dim), [{ name: "quarter", value: quarter, type: "STRING" }]);
-    res.json({ metricView: MARGIN_MV, dimension: dim, rows });
+    const params = [{ name: "quarter", value: quarter, type: "STRING" }];
+    const [rows, totals] = await Promise.all([runSql(explorerSql(dim), params), runSql(explorerTotalSql(), params)]);
+    res.json({ metricView: MARGIN_MV, dimension: dim, rows, total: totals[0] ?? null });
   } catch (e) {
     res.status(502).json({ error: (e as Error).message, metricView: MARGIN_MV });
   }

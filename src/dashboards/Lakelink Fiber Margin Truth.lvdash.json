@@ -504,6 +504,48 @@
         "FROM (SELECT owner_persona, MEASURE(identified_savings) AS identified_value\n",
         "      FROM cdm_tmforum._metrics.margin_onebillion_wall_mv GROUP BY owner_persona)\n"
       ]
+    },
+    {
+      "name": "ds_card_answers",
+      "displayName": "$1B Wall challenge card answer key (margin_ metric views)",
+      "queryLines": [
+        "-- $1B Wall challenge card answer key. Every value is a MEASURE() from a margin_ metric view; CM is never redefined here (DEC-002). Sales as-of DATE'2026-11-19' (DEC-019).\n",
+        "WITH fin AS (\n",
+        "  SELECT product_family, MEASURE(contribution_margin) AS cm\n",
+        "  FROM cdm_tmforum._metrics.margin_ledger_mv\n",
+        "  WHERE ledger_quarter = DATE_TRUNC('QUARTER', ADD_MONTHS(DATE'2026-11-19', -3))\n",
+        "  GROUP BY ALL HAVING MEASURE(contribution_margin) < 0),\n",
+        "ops AS (\n",
+        "  SELECT MEASURE(grooming_candidate_count) AS cand, MEASURE(candidate_monthly_cost) * 12 AS annual_cost, MEASURE(est_annual_savings) AS annual_savings\n",
+        "  FROM cdm_tmforum._metrics.margin_offnet_spend_mv),\n",
+        "sal AS (\n",
+        "  SELECT MEASURE(renewal_count) AS renewals, MEASURE(below_floor_renewal_count) AS below_floor, MEASURE(below_floor_renewal_revenue) AS bf_revenue\n",
+        "  FROM cdm_tmforum._metrics.margin_renewal_floor_mv),\n",
+        "mkt AS (\n",
+        "  SELECT segment, MEASURE(cm_pct) AS cm_pct, ANY_VALUE(portfolio_cm_pct) AS portfolio_cm_pct\n",
+        "  FROM cdm_tmforum._metrics.margin_segment_growth_mv WHERE room_to_grow = 'Yes' GROUP BY ALL),\n",
+        "led AS (\n",
+        "  SELECT MEASURE(revenue_leakage) AS leakage, MEASURE(carrier_rate_variance) AS rate_variance\n",
+        "  FROM cdm_tmforum._metrics.margin_ledger_mv)\n",
+        "SELECT 1 AS card_no, 'Legacy losses' AS card, 'Finance' AS persona,\n",
+        "  'Which product families lost money after cost to serve last quarter?' AS genie_question,\n",
+        "  CONCAT('Q3 2026: ', ARRAY_JOIN(ARRAY_SORT(COLLECT_LIST(CONCAT(product_family, ' ', FORMAT_NUMBER(CAST(cm AS DECIMAL(38,2)), 2)))), '; ')) AS expected_answer,\n",
+        "  'margin_ledger_mv' AS source_metric_view FROM fin\n",
+        "UNION ALL SELECT 2, 'Off-net grooming', 'Ops', 'Which off-net circuits run next to our own fiber, and what do we pay for them?',\n",
+        "  CONCAT(FORMAT_NUMBER(cand, 0), ' grooming candidates; annual off-net cost (what we pay) ', FORMAT_NUMBER(CAST(annual_cost AS DECIMAL(38,2)), 2), '; est. annual savings if moved on-net ', FORMAT_NUMBER(CAST(annual_savings AS DECIMAL(38,2)), 2)),\n",
+        "  'margin_offnet_spend_mv' FROM ops\n",
+        "UNION ALL SELECT 3, 'Renewals below the margin floor', 'Sales', 'Which renewals in the next 90 days are below the margin floor?',\n",
+        "  CONCAT(FORMAT_NUMBER(below_floor, 0), ' of ', FORMAT_NUMBER(renewals, 0), ' renewals (with ledger activity) below floor; revenue at stake ', FORMAT_NUMBER(CAST(bf_revenue AS DECIMAL(38,2)), 2)),\n",
+        "  'margin_renewal_floor_mv' FROM sal\n",
+        "UNION ALL SELECT 4, 'Room to grow', 'Marketing', 'Which segments have the highest margin and the most room to grow?',\n",
+        "  CONCAT(segment, ': CM ', FORMAT_NUMBER(CAST(cm_pct * 100 AS DECIMAL(38,1)), 1), '% vs portfolio ', FORMAT_NUMBER(CAST(portfolio_cm_pct * 100 AS DECIMAL(38,1)), 1), '%, revenue share below customer share'),\n",
+        "  'margin_segment_growth_mv' FROM mkt\n",
+        "UNION ALL SELECT 5, 'Revenue Leakage', 'Finance', 'How much Revenue Leakage is there to recover?',\n",
+        "  CONCAT('Revenue Leakage ', FORMAT_NUMBER(CAST(leakage AS DECIMAL(38,2)), 2)), 'margin_ledger_mv' FROM led\n",
+        "UNION ALL SELECT 6, 'Carrier Rate Variance', 'Ops', 'How much Carrier Rate Variance did carriers bill us above the contract rate?',\n",
+        "  CONCAT('Carrier Rate Variance ', FORMAT_NUMBER(CAST(rate_variance AS DECIMAL(38,2)), 2)), 'margin_ledger_mv' FROM led\n",
+        "ORDER BY card_no\n"
+      ]
     }
   ],
   "pages": [
@@ -2486,7 +2528,7 @@
                 "\n",
                 "\"Which product families lost money after cost to serve last quarter?\"\n",
                 "\n",
-                "Check: Page 1, Which product families lose money after cost to serve?\n"
+                "Check: Answer key row 1, and Page 1 'Which product families lose money after cost to serve?' (Quarter = Q3 2026)\n"
               ]
             }
           },
@@ -2507,7 +2549,7 @@
                 "\n",
                 "\"Which off-net circuits run next to our own fiber, and what do we pay for them?\"\n",
                 "\n",
-                "Check: Page 2, Which levers add up to the Wall? (Off-net grooming savings)\n"
+                "Check: Answer key row 2, and Page 2 lever 'Off-net grooming' (est. annual savings, not spend)\n"
               ]
             }
           },
@@ -2528,7 +2570,7 @@
                 "\n",
                 "\"Which renewals in the next 90 days are below the margin floor?\"\n",
                 "\n",
-                "Check: Page 1, Which circuits lose the most money? (filter Product Family)\n"
+                "Check: Answer key row 3, and Page 2 lever 'Renewal margin floor'\n"
               ]
             }
           },
@@ -2549,7 +2591,7 @@
                 "\n",
                 "\"Which segments have the highest margin and the most room to grow?\"\n",
                 "\n",
-                "Check: Page 1, Contribution Margin % with the Customer Segment filter\n"
+                "Check: Answer key row 4, and Page 1 Contribution Margin % with the Customer Segment filter\n"
               ]
             }
           },
@@ -2568,9 +2610,9 @@
                 "### Revenue Leakage\n",
                 "Persona: Finance\n",
                 "\n",
-                "\"How much Revenue Leakage did we have last quarter, and on which product families?\"\n",
+                "\"How much Revenue Leakage is there to recover?\"\n",
                 "\n",
-                "Check: Page 2, Lever detail (Revenue Leakage)\n"
+                "Check: Answer key row 5, and Page 2 lever 'Revenue leakage recovery'\n"
               ]
             }
           },
@@ -2589,9 +2631,9 @@
                 "### Carrier Rate Variance\n",
                 "Persona: Ops\n",
                 "\n",
-                "\"Which vendors billed us above the contract rate, and by how much Carrier Rate Variance?\"\n",
+                "\"How much Carrier Rate Variance did carriers bill us above the contract rate?\"\n",
                 "\n",
-                "Check: Page 2, Lever detail (Carrier Rate Variance)\n"
+                "Check: Answer key row 6, and Page 2 lever 'Carrier rate variance recovery'\n"
               ]
             }
           },
@@ -2616,9 +2658,93 @@
           },
           "position": {
             "x": 0,
-            "y": 7,
+            "y": 13,
             "width": 6,
             "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "w3_answer_key",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_card_answers",
+                  "fields": [
+                    {
+                      "name": "card_no",
+                      "expression": "`card_no`"
+                    },
+                    {
+                      "name": "card",
+                      "expression": "`card`"
+                    },
+                    {
+                      "name": "persona",
+                      "expression": "`persona`"
+                    },
+                    {
+                      "name": "genie_question",
+                      "expression": "`genie_question`"
+                    },
+                    {
+                      "name": "expected_answer",
+                      "expression": "`expected_answer`"
+                    },
+                    {
+                      "name": "source_metric_view",
+                      "expression": "`source_metric_view`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "card_no",
+                    "displayName": "Card"
+                  },
+                  {
+                    "fieldName": "card",
+                    "displayName": "Challenge"
+                  },
+                  {
+                    "fieldName": "persona",
+                    "displayName": "Persona"
+                  },
+                  {
+                    "fieldName": "genie_question",
+                    "displayName": "Ask Margin Genie"
+                  },
+                  {
+                    "fieldName": "expected_answer",
+                    "displayName": "Expected answer (USD, 2 dp)"
+                  },
+                  {
+                    "fieldName": "source_metric_view",
+                    "displayName": "Source metric view"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Challenge card answer key",
+                "showDescription": true,
+                "description": "Live MEASURE() values from margin_ledger_mv, margin_offnet_spend_mv, margin_renewal_floor_mv, margin_segment_growth_mv. Updates when an allocation rule changes."
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 7,
+            "width": 6,
+            "height": 6
           }
         }
       ],

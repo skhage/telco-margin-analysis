@@ -206,6 +206,8 @@ WHERE c.table_schema IN ('revenue_assurance','_metrics') AND c.table_name ILIKE 
   * `margin_segment_growth_mv` (2, deployed, linted 2026-11-13): segment, room_to_grow.
   * `margin_onebillion_wall_mv` (3, deployed, linted 2026-11-13): lever, owner_persona, source_metric.
   * `margin_offnet_spend_mv` deployed lint 2026-11-13: the 9 N/A dims above are the only format gaps (19 fields).
+* ID keys (v1.1 clarification, DP-STD-MV-FORMAT-NA): `format` is intentionally omitted on ID key dimensions even when the column type is numeric (bigint), because a `number` format would add thousands separators and change how an ID reads (e.g. 1,234,567). IDs are identifiers, not quantities.
+* Audit result 2026-11-13 (COO-Q-20261113-62): all 85 deployed MV fields have comment, display_name and synonyms; the 38 dimensions without `format` are all N/A under this rule (33 string/boolean, 5 bigint ID keys), and each is in the register above (12 + 9 + 12 + 2 + 3 = 38 deployed). Doc-only rule; no MV change (DEC-028 freeze).
 * Add any new ID/string/boolean dimension to this register in the same change that adds it.
 * Contribution margin is defined only in `margin_ledger_mv`; other views must not redefine it.
 

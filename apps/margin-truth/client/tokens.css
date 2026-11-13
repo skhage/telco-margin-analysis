@@ -45,6 +45,9 @@ th, td { text-align: left; padding: var(--llf-space-1); border-bottom: 1px solid
 th { color: var(--llf-muted); font-weight: 600; font-size: 13px; }
 td.num, th.num { text-align: right; }
 .neg { color: var(--llf-negative); font-weight: 600; }
+/* APP-EXPLORER-TOTAL-ROW: portfolio total footer (text color for AA, strong top rule, tokens only) */
+.llf-total th, .llf-total td { color: var(--llf-text); font-weight: 700; font-size: inherit; border-top: 2px solid var(--llf-secondary); border-bottom: 0; }
+.llf-total td.neg { color: var(--llf-negative); }
 .llf-state { color: var(--llf-muted); padding: var(--llf-space-3); text-align: center; }
 .llf-error { color: var(--llf-negative); }
 /* DSN-APP-A11Y-R2 item 2: visible table captions (muted, 13px, left) */
