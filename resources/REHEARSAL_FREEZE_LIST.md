@@ -23,12 +23,15 @@
 | Grooming agent | `agents/margin_grooming_agent.py`, `agents/margin_grooming_agent_tools.py`, `agents/gateway_sp_tracing_setup.py` | 5, 6 |
 | MLflow experiment | `agents/margin_grooming_agent_traces` (id 1235449331932066) | 6 |
 | Glossary domain | `2abc9194-aed9-4088-bfa6-4b4d33870ebd` (+ pages in `src/semantics/glossary_pages.json`) | 3, 4 |
-| Bundle | `bundle/` (databricks.yml, resources/*.yml, DEPLOY_RUNBOOK.md), tag `rehearsal-2026-11-17-rc1` | all |
+| Bundle | `bundle/` (databricks.yml, resources/*.yml, DEPLOY_RUNBOOK.md), tag `rehearsal-2026-11-17-rc2` (main 267608c; supersedes rc1 cef1fe7) | all |
 | CEO action sheet | `resources/CEO_ACTION_SHEET.md` | all |
 | Runbooks | `resources/scene3_live_allocation_runbook.md`, `apps/margin-truth/REDEPLOY.md`, `apps/margin-truth/SCENE5_CLICK_SCRIPT.md`, `bundle/DEPLOY_RUNBOOK.md` | 3, 5 |
 | Regression / reconciliation | `tests/` (cm_baseline_expected.sql, cm_regression_harness.py, cm_cross_surface_reconciliation.sql, stall_*) | QA |
+| Ledger / DQ SQL | `scripts/margin_repoint_allocated_v2.sql`, `scripts/margin_dq_gl_tieout.sql` (view `margin_dq_gl_tieout`) | 2, 3 |
 | Synthetic data | `data/margin_synth_*.sql`, `src/data/margin_synth_generator.py`, `scripts/margin_generate_pdfs.py` | 2 |
 | Project plan + instructions | `resources/projectplan.md`, `.assistant_instructions.md` (never delete) | — |
+
+Note (RP-FREEZE-LIST-VERIFY-R12, 2026-11-13): the Genie space and the MLflow experiment are workspace objects with no git copy; verify them by id, not on git main.
 
 ## Review after Nov 19 (do NOT delete before then)
 
