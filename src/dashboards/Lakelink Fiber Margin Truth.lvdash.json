@@ -1186,14 +1186,14 @@
               "encodings": {
                 "value": {
                   "fieldName": "sum(contribution_margin)",
-                  "displayName": "Contribution Margin",
+                  "displayName": "Contribution Margin (USD, exact)",
                   "format": {
                     "type": "number-currency",
                     "currencyCode": "USD",
-                    "abbreviation": "compact",
+                    "abbreviation": "none",
                     "decimalPlaces": {
-                      "type": "max",
-                      "places": 1
+                      "type": "exact",
+                      "places": 2
                     }
                   },
                   "style": {

@@ -111,6 +111,9 @@ CREATE OR REFRESH MATERIALIZED VIEW margin_ledger_v2 (
 )
 COMMENT 'Lakelink Fiber margin ledger (gold, pipeline build). Same schema and logic as fast-path margin_ledger (DEC-008); canonical source of margin_ledger_allocated since the DEC-023 repoint (no drop, no rename). For margin answers use metric view cdm_tmforum._metrics.margin_ledger_mv; contribution margin is defined only there (DEC-002). Do not SUM raw columns here. Grain: customer x product x circuit x month. Source: margin_billing, margin_carrier_invoices, margin_contracts, margin_circuits, margin_products, margin_customers, margin_gl_actuals, margin_allocation_rules.'
 TBLPROPERTIES ('telco_project' = 'margin_analysis')
+-- DE-ROWFILTER-LEDGER-V2 (2026-11-13): Sales own-accounts row filter, same function as margin_ledger/margin_customers/margin_contracts.
+-- Non-Sales principals are unfiltered, so MEASURE(contribution_margin) stays 2,375,095,705.09.
+WITH ROW FILTER cdm_tmforum.revenue_assurance.margin_sales_row_filter ON (customer_id)
 AS
 WITH base AS (
   SELECT

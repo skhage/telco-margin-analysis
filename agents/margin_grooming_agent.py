@@ -276,6 +276,40 @@ def gateway_chat(messages):
                            body={"model": GATEWAY_SERVICE, "messages": messages, "tools": TOOLS, "max_tokens": 800})
 
 
+# CM REFERENCE SPAN (COO-Q-20261113-57 / QA-F-AGENT-NO-CM-SPAN, 2026-11-13): every run records, in its own TOOL span,
+# the canonical CM from margin_ledger_mv (DEC-002/020) and the scene-4 Ops figures from margin_offnet_spend_mv, each with
+# its statement_id, so the trace proves the agent reads the same metric views as Genie and the dashboard.
+# Known answers: CM 2,375,095,705.09; 47 candidates; annual off-net cost 1,152,342.12 (= MEASURE(candidate_monthly_cost)*12);
+# annual estimated savings 412,539.96 (DEC-026 labels). Read-only; no margin math in the agent.
+CM_REFERENCE_SQL = ("SELECT CAST(MEASURE(contribution_margin) AS DECIMAL(38,2)) AS portfolio_contribution_margin_usd "
+                    "FROM cdm_tmforum._metrics.margin_ledger_mv")
+OFFNET_REFERENCE_SQL = ("SELECT MEASURE(grooming_candidate_count) AS grooming_candidate_count, "
+                        "CAST(MEASURE(candidate_monthly_cost) * 12 AS DECIMAL(31,2)) AS annual_offnet_cost_usd, "
+                        "MEASURE(est_annual_savings) AS est_annual_savings_usd "
+                        "FROM cdm_tmforum._metrics.margin_offnet_spend_mv WHERE is_grooming_candidate")
+
+
+def _run_sql_with_id(sql):
+    r = w.statement_execution.execute_statement(warehouse_id=WAREHOUSE_ID, statement=sql, wait_timeout="50s")
+    while r.status.state.value in ("PENDING", "RUNNING"):
+        time.sleep(2)
+        r = w.statement_execution.get_statement(r.statement_id)
+    if r.status.state.value != "SUCCEEDED":
+        raise RuntimeError(f"{r.status.state.value}: {r.status.error.message if r.status.error else ''}")
+    cols = [c.name for c in r.manifest.schema.columns]
+    return r.statement_id, dict(zip(cols, (r.result.data_array or [[None] * len(cols)])[0]))
+
+
+@mlflow.trace(name="margin_metric_view_reference", span_type=SpanType.TOOL)
+def margin_metric_view_reference():
+    cm_id, cm = _run_sql_with_id(CM_REFERENCE_SQL)
+    off_id, off = _run_sql_with_id(OFFNET_REFERENCE_SQL)
+    out = {"metric_view_cm": "cdm_tmforum._metrics.margin_ledger_mv", "cm_statement_id": cm_id, **cm,
+           "metric_view_offnet": "cdm_tmforum._metrics.margin_offnet_spend_mv", "offnet_statement_id": off_id, **off}
+    mlflow.get_current_active_span().set_attributes({k: str(v) for k, v in out.items()})
+    return out
+
+
 @mlflow.trace(name="lakelink_offnet_grooming_agent", span_type=SpanType.AGENT)
 def run_agent(task, max_turns=8):
     mlflow.update_current_trace(tags={"telco_project": "margin_analysis", "company": "Lakelink Fiber",
@@ -284,8 +318,11 @@ def run_agent(task, max_turns=8):
                                       "genie_space_id": str(MARGIN_GENIE_SPACE_ID),
                                       "identity_mode": "sp" if AGENT_SP_APP_ID else "user_fallback",
                                       "run_as": w.current_user.me().user_name, "gateway_service": GATEWAY_SERVICE})
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": task}]
-    calls = []
+    ref = margin_metric_view_reference()  # canonical CM + Ops figures from the metric views, logged in the trace
+    messages = [{"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": task + "\n\nMetric view reference (copy, do not recompute): "
+                 + json.dumps(ref, default=str)}]
+    calls = ["margin_metric_view_reference"]
     for _ in range(max_turns):
         msg = gateway_chat(messages)["choices"][0]["message"]
         messages.append({k: v for k, v in msg.items() if k in ("role", "content", "tool_calls")})
