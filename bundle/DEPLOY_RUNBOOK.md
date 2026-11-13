@@ -97,6 +97,22 @@ The dev target is therefore BLOCKED in this workspace unless step 3 (bind all th
 
 (c) Command to run:
 * In THIS (demo) workspace: `databricks bundle deploy -t jobs_only`. It yields 4 jobs and 0 apps, dashboards, or pipelines. The ONE app, ONE dashboard, and ONE pipeline stay the live originals, so the count of each is exactly 1.
-* In the customer's FRESH dev workspace (leave-behind): from `bundle/`, run `databricks bundle validate --strict -t dev` and then `databricks bundle deploy -t dev`. With no pre-existing assets, this creates exactly 1 app, 1 dashboard, 1 pipeline, and 4 jobs, as shown in the summary table above. Genie is recreated from `../genie/margin_genie_instructions.md`, because it is not a bundle resource.
+* In the customer's FRESH dev workspace (leave-behind): from `bundle/`, run `databricks bundle validate --strict -t dev` and then `databricks bundle deploy -t dev`. With no pre-existing assets, this creates exactly 1 app, 1 dashboard, 1 pipeline, and 4 jobs, as shown in the summary table above. Genie is recreated from `../genie/margin_genie_instructions.md`, because it is not a bundle resource. Run the section 8 Genie guard first.
 
 (d) asset_ledger: nothing has been deployed, so there are no rows yet. Any future deploy logs one row per created job.
+
+## 8. Genie space guard: check by title BEFORE creating a Margin Genie (COO-Q-20261113-78 part 2)
+
+The Genie space is not a bundle resource, so no bind protects it. Run this check before any step that creates a Genie space (fresh-workspace leave-behind in 7(c), or a rebuild after a redeploy). It keeps the count at exactly ONE Margin Genie.
+
+1. List ALL Genie spaces by title, every page (the list is paginated; this workspace had 409 spaces on 2026-11-13):
+
+```
+databricks api get /api/2.0/genie/spaces                                  # first page
+databricks api get "/api/2.0/genie/spaces?page_token=<NEXT_PAGE_TOKEN>"   # repeat until next_page_token is empty
+```
+
+2. Search every page for the title `Lakelink Fiber Margin Genie` (exact match on `title`).
+3. If a space with that title exists, SKIP creation. Reuse its `space_id` (demo workspace: `01f1df115a08164aab3ae5f6faac807c`) and update its instructions from `../genie/margin_genie_instructions.md` in place if needed.
+4. Only if no page has that title, create ONE space titled `Lakelink Fiber Margin Genie` from `../genie/margin_genie_instructions.md`, then log it in Lakebase `asset_ledger` (asset_type `genie_space`, action `created`).
+5. After the step, list again (all pages) and confirm that exactly one space has that title. If there are two, stop and escalate to @pm. Do not delete a space without CEO OK.
