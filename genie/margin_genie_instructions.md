@@ -1,6 +1,27 @@
-# Margin Genie - instructions DRAFT v0.1 (P2-MV-YAML-DRAFT, @data-analyst, 2026-11-12)
+# Margin Genie - instructions v1.0 LIVE (P3-MARGIN-GENIE, @data-analyst, 2026-11-13)
 
-Company: Lakelink Fiber (fictional). ONE Margin Genie for Finance, Ops, Sales, Marketing (DEC-005). Not yet created: P3-MARGIN-GENIE waits on P2-MV-MARGIN-LEDGER.
+Company: Lakelink Fiber (fictional). ONE Margin Genie for Finance, Ops, Sales, Marketing (DEC-005).
+
+## Live space
+* space_id `01f1df115a08164aab3ae5f6faac807c`, warehouse telco_cdm_model (`bf0baa637e887c80`), asset_ledger row 65.
+* The live serialized space is the source of truth. It holds the text instructions (10 core rules + 16-term glossary), 5 example SQLs, join specs, the UC function `margin_score_onnet_move`, and 5 benchmarks. The SQL below is the draft history.
+* Tables in the space: `_metrics.margin_ledger_mv` (primary), plus the dims `margin_circuits`, `margin_contracts`, `margin_products`, `margin_vendors`. Raw source tables and the `margin_ledger` table are not in the space.
+* Fixed as-of date DATE'2026-11-19' (DEC-019). Last quarter = Q3 2026.
+
+## Space title and description (DSN-GENIE-COPY-R1, DESIGN_TOKENS section 9)
+* Title: Lakelink Fiber Margin Genie
+* Description: "Ask Lakelink Fiber margin questions in plain English. One space for Finance, Ops, Sales, and Marketing. Margin always means contribution margin (revenue minus network expense minus cost to serve) from the governed metric view margin_ledger_mv, so every team gets the same number."
+* Sample questions, in order: Finance, Ops, Sales, Marketing (the plan starters, using "our own fiber").
+
+## Verified answers 2026-11-13 (Genie conversation API vs independent raw SQL on margin_ledger_allocated)
+| Persona | Expected | Genie |
+| --- | --- | --- |
+| Finance Q3-2026 | IP-VPN -6,715,475.88; Legacy Voice -249,532.74 | match |
+| Ops | 47 circuits, cost 96,028.51/mo, savings 34,378.33/mo; 45040 879.34, 98532 469.00 | match (after OPS RULE) |
+| Sales @2026-11-19 | 586 below floor | match |
+| Marketing | Commercial = only room-to-grow segment (CM % 54.4% vs 54.1% portfolio) | match |
+| Total CM | 2,375,095,705.09 | match |
+Note: -998,851.80 (Legacy Voice) and -26,610,544.90 (IP-VPN) are full-ledger 12-month totals, not last-quarter figures.
 
 ## Data sources (metric views + ledger only, never raw source tables)
 * `cdm_tmforum._metrics.margin_ledger_mv` (primary; defines contribution margin)
@@ -62,7 +83,7 @@ GROUP BY ALL HAVING cm_pct < margin_floor_pct ORDER BY term_end;
 ```
 
 ### Marketing - "Which segments have the highest margin and the most room to grow?"
-"Room to grow" is defined in `margin_segment_growth_mv` (proposal: high cm_pct with low share of revenue). Base query:
+"Room to grow" (DEC-013) = segments whose cm_pct is above the portfolio average AND whose revenue share is below their customer-count share (margin_segment_growth_mv when deployed; until then the live space computes it from margin_ledger_mv). Base query:
 ```sql
 SELECT segment, MEASURE(contribution_margin) AS contribution_margin, MEASURE(cm_pct) AS cm_pct, MEASURE(customer_count) AS customers
 FROM cdm_tmforum._metrics.margin_ledger_mv

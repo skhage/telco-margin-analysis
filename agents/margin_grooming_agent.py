@@ -19,6 +19,13 @@ FALLBACK PATH (ML-GROOMING-FALLBACK-PATH, 2026-11-13) - used when STUB_MODE=Fals
   CAUTION: proxy savings for hero circuits 45040/98532 are about -714 USD, so proxy never drafts hero tickets.
 * draft_savings_ticket re-checks values against score_onnet_move and refuses savings <= 0.
 Known answers (carrier_invoice basis): 45040 cost 2880.05 savings 879.34 score 65; 98532 cost 2469.86 savings 469.00 score 59.
+
+DRY RUN (ML-GROOMING-DRYRUN-TOOLS, 2026-11-13):
+* GENIE SWITCH (one line): set MARGIN_GENIE_SPACE_ID to the Margin Genie space id. None -> GENIE_STANDIN_SQL
+  (margin_score_onnet_move + MEASURE(contribution_margin) from margin_ledger_mv, genie_basis=sql_standin);
+  set -> real Genie Conversation API (genie_basis=margin_genie).
+* DRY_RUN=True: draft_savings_ticket runs every guard but writes NOTHING to the app queue (returns would_insert).
+  Stand-in known answers: 47 candidates (DEC-017); MV total 2,375,095,705.09 (DEC-020).
 """
 import json, time, uuid
 import mlflow, psycopg
@@ -27,7 +34,8 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import StatementParameterListItem
 
 STUB_MODE = False
-MARGIN_GENIE_SPACE_ID = None  # set when P3-MARGIN-GENIE lands
+DRY_RUN = True  # True = validate tickets but never INSERT into the app approval queue
+MARGIN_GENIE_SPACE_ID = None  # ONE-LINE GENIE SWITCH: set to the P3-MARGIN-GENIE space id to use real Margin Genie
 WAREHOUSE_ID = "bf0baa637e887c80"
 _last_basis = {}
 
@@ -40,6 +48,21 @@ JOIN cdm_tmforum.revenue_assurance.margin_vendors v ON v.vendor_id = c.vendor_id
 LEFT JOIN latest l ON l.circuit_id = c.circuit_id AND l.rn = 1
 WHERE c.is_on_net = FALSE AND c.is_parallel_to_onnet_fiber AND c.circuit_id IN (45040, 98532)
 ORDER BY l.paid_amount_usd DESC NULLS LAST"""
+
+# Genie stand-in (ML-GROOMING-DRYRUN-TOOLS): margin figures come ONLY from margin_ledger_mv MEASURE() (DEC-002/020);
+# candidate filter = DEC-017 Ops hero filter (parallel to own fiber AND savings > 0) -> 47 rows.
+GENIE_STANDIN_SQL = """
+WITH s AS (SELECT * FROM cdm_tmforum.revenue_assurance.margin_score_onnet_move(CAST(NULL AS BIGINT))
+           WHERE is_parallel_to_onnet_fiber AND est_monthly_savings_usd > 0),
+cm AS (SELECT circuit_id, MEASURE(contribution_margin) AS contribution_margin_usd,
+              MEASURE(offnet_network_expense) AS offnet_network_expense_usd
+       FROM cdm_tmforum._metrics.margin_ledger_mv
+       WHERE is_on_net = FALSE AND circuit_id IN (SELECT circuit_id FROM s) GROUP BY circuit_id)
+SELECT s.circuit_id, s.vendor_id, s.monthly_offnet_cost_usd, s.est_monthly_savings_usd, s.score,
+       cm.contribution_margin_usd, cm.offnet_network_expense_usd
+FROM s LEFT JOIN cm ON cm.circuit_id = s.circuit_id
+ORDER BY s.score DESC, s.est_monthly_savings_usd DESC
+LIMIT 10"""
 
 PROXY_SQL = """
 SELECT c.circuit_id, c.vendor_id, c.is_parallel_to_onnet_fiber, c.onnet_distance_m,
@@ -121,11 +144,36 @@ def ask_margin_genie(question):
     if STUB_MODE:
         return {"stub": True, "answer": "STUB: Off-net circuit 45040 runs 51 m from Lakelink Fiber fiber; latest monthly carrier cost USD 2,400.00."}
     if MARGIN_GENIE_SPACE_ID is None:
-        _last_basis["genie_basis"] = "sql_fallback"
-        return {"genie_basis": "sql_fallback",
-                "note": "Margin Genie space not yet available; answered from margin_circuits + margin_vendors + margin_carrier_invoices. No margin figures returned.",
-                "rows": run_sql(GENIE_FALLBACK_SQL)}
-    raise NotImplementedError("Wire Genie Conversation API once P3-MARGIN-GENIE sets the space id")
+        _last_basis["genie_basis"] = "sql_standin"
+        return {"genie_basis": "sql_standin",
+                "note": "Margin Genie space not yet available; answered with margin_score_onnet_move + MEASURE(contribution_margin) from margin_ledger_mv (top 10 of the DEC-017 candidates).",
+                "rows": run_sql(GENIE_STANDIN_SQL)}
+    _last_basis["genie_basis"] = "margin_genie"
+    return genie_ask(question)
+
+
+def genie_ask(question, timeout_s=120):
+    """Real Margin Genie via Genie Conversation API: start conversation, poll, fetch query result."""
+    base = f"/api/2.0/genie/spaces/{MARGIN_GENIE_SPACE_ID}"
+    m = w.api_client.do("POST", f"{base}/start-conversation", body={"content": question})
+    cid, mid = m["conversation_id"], m["message_id"]
+    t0 = time.time()
+    while True:
+        msg = w.api_client.do("GET", f"{base}/conversations/{cid}/messages/{mid}")
+        if msg.get("status") in ("COMPLETED", "FAILED", "CANCELLED", "QUERY_RESULT_EXPIRED") or time.time() - t0 > timeout_s:
+            break
+        time.sleep(3)
+    out = {"genie_basis": "margin_genie", "status": msg.get("status"), "conversation_id": cid, "message_id": mid}
+    for att in msg.get("attachments") or []:
+        if att.get("text"):
+            out["text"] = att["text"].get("content")
+        if att.get("query"):
+            out["sql"] = att["query"].get("query")
+            res = w.api_client.do("GET", f"{base}/conversations/{cid}/messages/{mid}/attachments/{att['attachment_id']}/query-result")
+            sr = res.get("statement_response", {})
+            cols = [c["name"] for c in sr.get("manifest", {}).get("schema", {}).get("columns", [])]
+            out["rows"] = [dict(zip(cols, r)) for r in (sr.get("result", {}).get("data_array") or [])[:20]]
+    return out
 
 
 @mlflow.trace(name="score_onnet_move", span_type=SpanType.TOOL)
@@ -170,6 +218,10 @@ def draft_savings_ticket(circuit_id, vendor_id, monthly_cost, est_monthly_saving
             return {"error": "values do not match score_onnet_move or savings <= 0; ticket not drafted"}
         extra = {"identity_mode": "sp" if AGENT_SP_APP_ID else "user_fallback", "score_basis": chk[0]["score_basis"],
                  "genie_basis": _last_basis.get("genie_basis", "margin_genie"), "score": int(chk[0]["score"])}
+    if DRY_RUN:  # all guards passed; never write to the app queue in a dry run
+        mlflow.get_current_active_span().set_attribute("dry_run", True)
+        return {"dry_run": True, "would_insert": {"ticket_id": tid, "circuit_id": int(circuit_id), "vendor_id": vendor_id,
+                "monthly_cost": float(monthly_cost), "est_monthly_savings": float(est_monthly_savings), **extra}}
     with app_conn() as conn, conn.cursor() as cur, conn.transaction():
         cur.execute(
             """INSERT INTO public.approval_tickets (ticket_id, ticket_type, approver_role, title, circuit_id, vendor_id,
@@ -198,7 +250,8 @@ def gateway_chat(messages):
 @mlflow.trace(name="lakelink_offnet_grooming_agent", span_type=SpanType.AGENT)
 def run_agent(task, max_turns=8):
     mlflow.update_current_trace(tags={"telco_project": "margin_analysis", "company": "Lakelink Fiber",
-                                      "stub_run": str(STUB_MODE).lower()})
+                                      "stub_run": str(STUB_MODE).lower(), "dry_run": str(DRY_RUN).lower(),
+                                      "genie_mode": "margin_genie" if MARGIN_GENIE_SPACE_ID else "sql_standin"})
     messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": task}]
     calls = []
     for _ in range(max_turns):

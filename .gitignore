@@ -224,3 +224,5 @@ scratch/
 
 # Margin Truth: MLflow experiment objects are workspace assets, not git-supported files
 agents/margin_grooming_agent_traces
+# Margin Truth: Genie space objects (dataRoom) are workspace assets, not git-supported files
+genie/*.geniespace.json

@@ -1,0 +1,27 @@
+# Lakelink Fiber - Margin Truth: synthetic data generator job (DEVOPS-BUNDLE-LIVE-ASSETS).
+# Runs src/data/margin_synth_generator.py over data/*.sql into the EXISTING schema
+# ${var.catalog}.${var.schema} (the script refuses if the schema is missing; never creates it).
+# Default is a DRY RUN. --execute OVERWRITES the live margin_ demo tables and the fast-path ledger,
+# so rerun P2-MV-VALIDATION / tests/cm_regression_harness.py afterwards:
+#   databricks bundle run margin_synth_generator_job --python-params "--catalog,cdm_tmforum,--schema,revenue_assurance,--execute"
+resources:
+  jobs:
+    margin_synth_generator_job:
+      name: lakelink-margin-synth-generator
+      description: Rebuilds Lakelink Fiber margin_ synthetic tables + fast-path ledger (dry run by default; telco_project=margin_analysis)
+      max_concurrent_runs: 1
+      timeout_seconds: 3600
+      environments:
+        - environment_key: synth_env
+          spec:
+            environment_version: "3"
+      tasks:
+        - task_key: margin_synth_generator
+          environment_key: synth_env
+          spark_python_task:
+            python_file: ../../src/data/margin_synth_generator.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}

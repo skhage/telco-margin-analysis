@@ -56,6 +56,9 @@ dimensions:
     expr: bandwidth_mbps
     display_name: Bandwidth (Mbps)
     comment: "Nominal circuit bandwidth in megabits per second."
+    format:
+      type: number
+      decimal_places: {type: max, places: 0}
     synonyms: [speed, capacity]
   - name: route_description
     expr: route_description
@@ -71,6 +74,9 @@ dimensions:
     expr: onnet_distance_m
     display_name: Distance to Own Fiber (m)
     comment: "Meters from the circuit route to the nearest Lakelink Fiber fiber."
+    format:
+      type: number
+      decimal_places: {type: max, places: 0}
     synonyms: [distance to fiber]
   - name: is_grooming_candidate
     expr: is_grooming_candidate
@@ -81,6 +87,9 @@ dimensions:
     expr: score
     display_name: On-net Move Score
     comment: "0-100 score from margin_score_onnet_move: 50 for running next to own fiber plus up to 50 for savings as a share of cost."
+    format:
+      type: number
+      decimal_places: {type: exact, places: 2}
     synonyms: [grooming score, priority score]
 measures:
   - name: offnet_circuit_count

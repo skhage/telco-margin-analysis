@@ -19,6 +19,9 @@ const MLFLOW_EXPERIMENT_ID = process.env.MLFLOW_EXPERIMENT_ID ?? "";
 // Feature flag (APP-EXPLORER-PRESTAGE): auto = go live as soon as the metric view exists; on = always query; off = hide.
 const EXPLORER_MODE = (process.env.MARGIN_EXPLORER_MODE ?? "auto").toLowerCase() as "auto" | "on" | "off";
 const PORT = Number(process.env.DATABRICKS_APP_PORT ?? process.env.PORT ?? 8000);
+// APP-HIDE-TEST-TICKETS (DEC-018 fallback): TEST-* tickets are hidden from queue, decisions and evidence unless SHOW_TEST_TICKETS=true. Rows are never deleted.
+const SHOW_TEST_TICKETS = (process.env.SHOW_TEST_TICKETS ?? "false").toLowerCase() === "true";
+const isHiddenTestTicket = (id: string) => !SHOW_TEST_TICKETS && id.toUpperCase().startsWith("TEST-");
 
 const APPROVER_ROLES = ["Ops", "AP", "FP&A"] as const;
 type ApproverRole = (typeof APPROVER_ROLES)[number];
@@ -140,8 +143,9 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
               rationale, agent_name, agent_sp_name, trace_id, status, created_at, decided_by, decided_at
          FROM public.approval_tickets
         WHERE ($1 = '' OR approver_role = $1) AND ($2 = 'all' OR status = $2)
+          AND ($3::boolean OR ticket_id NOT ILIKE 'TEST-%')
         ORDER BY created_at DESC LIMIT 200`,
-      [role, status],
+      [role, status, SHOW_TEST_TICKETS],
     );
     res.json(rows);
   } catch (e) {
@@ -155,6 +159,7 @@ app.post("/api/tickets/:id/decision", async (req: Request, res: Response) => {
   const comment = String(req.body?.comment ?? "").slice(0, 2000);
   if (!["approved", "rejected"].includes(decision)) return res.status(400).json({ error: "decision must be approved or rejected" });
   if (!APPROVER_ROLES.includes(role)) return res.status(400).json({ error: "role must be Ops, AP or FP&A" });
+  if (isHiddenTestTicket(req.params.id)) return res.status(404).json({ error: "not found" });
   const who = approver(req);
   const client = await pool.connect();
   try {
@@ -184,6 +189,7 @@ app.post("/api/tickets/:id/decision", async (req: Request, res: Response) => {
 
 // Post-approval evidence: ticket + audit trail + agent identity + MLflow trace link (P3-APP-TRACE-VIEW extends this)
 app.get("/api/tickets/:id/evidence", async (req: Request, res: Response) => {
+  if (isHiddenTestTicket(req.params.id)) return res.status(404).json({ error: "not found" });
   try {
     const t = await pool.query("SELECT * FROM public.approval_tickets WHERE ticket_id = $1", [req.params.id]);
     if (t.rowCount !== 1) return res.status(404).json({ error: "not found" });

@@ -19,3 +19,6 @@ env:
     value: ""
   - name: MLFLOW_EXPERIMENT_ID
     value: "1235449331932066"
+  # APP-HIDE-TEST-TICKETS: hide TEST-* tickets from queue/decision/evidence (non-destructive; set "true" to show)
+  - name: SHOW_TEST_TICKETS
+    value: "false"

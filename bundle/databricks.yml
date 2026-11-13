@@ -12,7 +12,9 @@
 #   margin_scorecard.dashboard.yml   ONE AI/BI dashboard (CFO scorecard + $1B Wall)
 #   margin_app.app.yml               ONE Databricks App (approval queue + margin explorer)
 #   margin_stall_monitor.job.yml     hourly swarm stall monitor over the Lakebase task board
-#   margin_genie (Genie agent)       exported space config, deployed by job/script (see README.md)
+#   margin_metric_views.job.yml      deploys src/metric_views/*.yaml into ${var.metrics_schema} (dry run default)
+#   margin_synth_generator.job.yml   rebuilds margin_ synthetic tables + fast-path ledger (dry run default)
+#   margin_genie (Genie agent)       space 01f1df115a08164aab3ae5f6faac807c; config in ../genie (see README.md)
 # Secrets and tokens are NEVER committed; use secret scopes or app resources.
 
 bundle:
@@ -28,6 +30,8 @@ sync:
     - ../apps/margin-truth
     - ../agents
     - ../tests
+    - ../src
+    - ../data
   # DEVOPS-EXCLUDE-PROJECTPLAN (QA-F-BRAND-PROJECTPLAN): resources/projectplan.md is a
   # CEO-supplied research reference that names a real company. It must NEVER ship in the
   # bundle or the app source. ../resources is intentionally not in sync.paths; this

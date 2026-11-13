@@ -1,7 +1,8 @@
 # Lakelink Fiber - Margin Truth: job that (re)creates the margin_ UC functions in the EXISTING
-# schema ${var.catalog}.${var.schema}. DRAFT (DEVOPS-BUNDLE-RESOURCES-DRAFT): run only after
-# P4-UC-FN-ONNET-SCORE confirms margin_carrier_invoices exists. Add margin_compare_rates as a
-# second task if P4-UC-FN-RATE-COMPARE is built (stretch, DEC-007).
+# schema ${var.catalog}.${var.schema}. LIVE (DEVOPS-BUNDLE-LIVE-ASSETS, 2026-11-13): both functions
+# exist in cdm_tmforum.revenue_assurance (margin_score_onnet_move 2026-11-12, margin_compare_rates
+# 2026-11-13). The SQL files hard-code cdm_tmforum.revenue_assurance (= the bundle defaults).
+# CREATE OR REPLACE FUNCTION only; never creates schemas.
 resources:
   jobs:
     margin_functions_job:
@@ -14,4 +15,12 @@ resources:
             warehouse_id: ${var.warehouse_id}
             file:
               path: ../../agents/margin_score_onnet_move.sql
+              source: WORKSPACE
+        - task_key: margin_compare_rates
+          depends_on:
+            - task_key: margin_score_onnet_move
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: ../../agents/margin_compare_rates.sql
               source: WORKSPACE

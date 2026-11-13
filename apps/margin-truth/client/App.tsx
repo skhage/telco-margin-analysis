@@ -55,11 +55,16 @@ function ApprovalQueue() {
     if (evidence && focusEvidence.current) { focusEvidence.current = false; evidenceHeading.current?.focus(); }
   }, [evidence]);
 
-  const load = useCallback(() => {
+  // DSN-APP-QUEUE-LIVE-R1: loading state is announced through the single persistent role=status region (designer note 247).
+  // announceLoad=false after a decision so the decision announcement is not overwritten.
+  const load = useCallback((announceLoad: boolean = true) => {
     setTickets(null); setError(null);
-    api<Ticket[]>(`/api/tickets?role=${encodeURIComponent(role)}&status=${status}`).then(setTickets).catch((e) => setError(`Approval queue unavailable. Try again, or check that the Lakebase approval database is reachable. (${e.message})`));
+    if (announceLoad) setAnnounce("Loading tickets...");
+    api<Ticket[]>(`/api/tickets?role=${encodeURIComponent(role)}&status=${status}`)
+      .then((rows) => { setTickets(rows); if (announceLoad) setAnnounce(`${plural(rows.length, "ticket", "tickets")} loaded.`); })
+      .catch((e) => setError(`Approval queue unavailable. Try again, or check that the Lakebase approval database is reachable. (${e.message})`));
   }, [role, status]);
-  useEffect(load, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const showEvidence = (id: string) => api<Evidence>(`/api/tickets/${encodeURIComponent(id)}/evidence`).then(setEvidence).catch((e) => setError(`Evidence could not be loaded. Try again in a moment. (${e.message})`));
   const decide = async (id: string, title: string, decision: "approved" | "rejected") => {
@@ -68,7 +73,7 @@ function ApprovalQueue() {
     try {
       await api(`/api/tickets/${encodeURIComponent(id)}/decision`, { method: "POST", body: JSON.stringify({ decision, role }) });
       setAnnounce(`${title} ${decision === "approved" ? "approved" : "rejected"} by ${role}. Decision recorded in the audit log.`);
-      load();
+      load(false);
       if (decision === "approved") { focusEvidence.current = true; await showEvidence(id); }
     } catch (e) {
       setError(`Decision not saved for ${title}. Try again; if it repeats, the ticket may already be decided. (${(e as Error).message})`);
@@ -95,7 +100,7 @@ function ApprovalQueue() {
       </div>
       <p className="llf-sr-only" aria-live="polite" role="status">{announce}</p>
       {error && <p role="alert" className="llf-error">{error}</p>}
-      {tickets === null && !error && <p className="llf-state" aria-live="polite">Loading tickets...</p>}
+      {tickets === null && !error && <p className="llf-state">Loading tickets...</p>}
       {tickets?.length === 0 && <p className="llf-state">No {status === "all" ? "" : status} tickets for {role}.</p>}
       {tickets && tickets.length > 0 && (
         <div className="llf-card llf-table-wrap">

@@ -1,6 +1,8 @@
 # Margin Truth — Semantic Standards and Frozen Column Contract
 
-Owner: @data-planner · Status: FROZEN v1.0 (2026-11-12) · Task: P0-SEMANTIC-STANDARDS · Company: Lakelink Fiber (fictional)
+Owner: @data-planner · Status: FROZEN v1.1 (2026-11-13; v1.0 2026-11-12) · Tasks: P0-SEMANTIC-STANDARDS, v1.1: COO-Q-20261112-11, DP-MV-FORMAT-GAPS, DP-STANDARDS-VENDOR-ID, DP-STANDARDS-V11-ALLOCATED-VIEW · Company: Lakelink Fiber (fictional)
+
+v1.1 changes (no column name or type changes, so no new DEC row needed): (1) section 5 format rule: `format` is required on numeric/currency/percent/date fields and N/A by design on ID/string/boolean dimensions; (2) `vendor_id` = `salesforce_source.partner_account.Id`, `vendor_type` in (`wholesale`, `CLEC`); (3) `margin_ledger_allocated` is the cost-to-serve source of truth for metric views (section 3a).
 
 This document is the single contract that the fast-path ledger (DEC-008), the SDP pipeline, metric views, Margin Genie, the dashboard, the app and the agents build against. Changing a frozen column name or type requires a new `decisions` row (DEC-*) approved by @pm, and a version bump here.
 
@@ -28,10 +30,10 @@ margin_ledger: customer x product x circuit x month, FKs to all four dimensions
   * `product_id` = `salesforce_source.product2.Id` (8 products). Legacy products not in product2 are added in `margin_products` with `origin='SYNTHETIC'` and id prefix `MGN-PRD-`.
   * `contract_id` = `salesforce_source.contract_line_item.Id` (56,088 lines; every line joins to `contract`, every line's `Product2Id` exists in product2, every contract's `AccountId` exists in account).
   * `circuit_id` = `contract_line_item.Service_Circuit_Id__c` = `tmf_service.customer_facing_service.customer_facing_service_id` (all 42,906 distinct line circuit ids match).
-  * `vendor_id`: no supplier/vendor table was found by table-name scan of `tmf_businesspartner`; vendors are created in `margin_vendors` (`origin='SYNTHETIC'`, id prefix `MGN-VND-`).
+  * `vendor_id` = `salesforce_source.partner_account.Id` (v1.1, DEC-003 / DP-GAP-VENDOR-PARTNER-KEYS). `margin_vendors` holds the 30 partner accounts with `Partner_Type__c` Wholesale Carrier (-> `vendor_type='wholesale'`, 15) or Interconnect (-> `vendor_type='CLEC'`, 15). Verified 2026-11-13: 30/30 ids exist in partner_account, 0 use the retired `MGN-VND-` prefix. No ILEC vendors.
   * Never invent a FK value that is absent from its parent table.
 
-## 3. Frozen column contract v1.0
+## 3. Frozen column contract v1.1 (column names/types unchanged from v1.0)
 
 All tables in `cdm_tmforum.revenue_assurance`. `PK` = primary key, `FK→` = foreign key. Null rule: columns are NOT NULL unless marked *nullable*.
 
@@ -61,9 +63,9 @@ All tables in `cdm_tmforum.revenue_assurance`. `PK` = primary key, `FK→` = for
 ### margin_vendors — grain: one row per third-party carrier
 | Column | Type | Notes |
 |---|---|---|
-| vendor_id | STRING | PK, `MGN-VND-###` |
+| vendor_id | STRING | PK, `salesforce_source.partner_account.Id` (v1.1; was `MGN-VND-###` in v1.0) |
 | vendor_name | STRING | Fictional carrier names only |
-| vendor_type | STRING | `ILEC`, `CLEC`, `wholesale` |
+| vendor_type | STRING | `wholesale` (Wholesale Carrier) or `CLEC` (Interconnect) (v1.1; ILEC not used) |
 | origin, source_system | STRING | |
 
 ### margin_contracts — grain: one row per contract line
@@ -171,6 +173,14 @@ All tables in `cdm_tmforum.revenue_assurance`. `PK` = primary key, `FK→` = for
 
 The ledger does NOT store contribution margin; it is defined once in `cdm_tmforum._metrics.margin_ledger_mv` (DEC-002). Cost to serve must be recomputed when allocation rules change (view or rebuild), so scene 3 updates every answer.
 
+### 3a. margin_ledger_allocated (VIEW) — cost-to-serve source of truth (v1.1)
+
+* `cdm_tmforum.revenue_assurance.margin_ledger_allocated` has the same grain and columns as `margin_ledger`, but recomputes `cost_to_serve_usd` at query time from the active rows of `margin_allocation_rules` and the cost pools in `margin_gl_actuals`. Changing a rule weight updates every answer with no rebuild (scene 3).
+* Stored `margin_ledger.cost_to_serve_usd` is the baseline from the `MGN-ALR-v1` rules only. Do not use it for answers.
+* Every metric view that reports cost to serve or contribution margin must source `margin_ledger_allocated`, never `margin_ledger`. `margin_ledger_mv` already does this.
+* Canonical total (DEC-020): MEASURE(contribution_margin) = 2,375,095,705.09 at default rules. `margin_ledger` gives 2,375,095,704.83 (+0.26 per-row rounding gap), so only use it as an independent raw-SQL check.
+* It is a view, so column comments come from its SELECT definition or a redeploy; `ALTER COLUMN ... COMMENT` does not apply.
+
 ## 4. Comment standard
 
 * Table comment: `<What it is>. Grain: <grain>. Source: <system or synthetic>. Synonyms: <a, b>. Lakelink Fiber Margin Truth.`
@@ -186,7 +196,13 @@ WHERE c.table_schema IN ('revenue_assurance','_metrics') AND c.table_name ILIKE 
 ## 5. Metric view YAML convention
 
 * One file per view in `src/metric_views/<name>.yaml`; deployed as `cdm_tmforum._metrics.margin_<subject>_mv`.
-* Every dimension and measure has `comment`, `display_name`, `format`, `synonyms`. Money format: currency USD, 0 decimals in dashboards; percentages: percent, 1 decimal.
+* Every dimension and measure has `comment`, `display_name`, `synonyms`.
+* `format` (v1.1): required on every measure and on every numeric, currency, percent, or date/datetime dimension. Money: `currency` USD, 0 decimals in dashboards; percentages: `percentage`, 1 decimal; counts: `number`, 0 decimals; months/quarters: `date`. The metric view spec only has numeric, currency, percentage, byte, date, and date_time format types, with no format type for text or boolean. So `format` is **N/A by design** for ID, string, and boolean dimensions, and the audit counts those as passing. Text values are made readable through `expr` (for example `network_type` maps `is_on_net` to 'On-net'/'Off-net') and through `display_name`.
+* Format-N/A register (each must have comment + display_name + synonyms):
+  * `margin_ledger_mv` (12): customer_id, segment, region, product_id, product_family, family_class, contract_id, circuit_id, is_on_net, network_type, vendor_id, allocation_rule_version.
+  * `margin_offnet_spend_mv` YAML: circuit_id, contract_id, customer_id, vendor_id, vendor_name, vendor_type, route_description, is_parallel_to_onnet_fiber, is_grooming_candidate are N/A. `bandwidth_mbps` (number), `onnet_distance_m` (number), and `score` (number, 2 decimals) are numeric and carry a format (added 2026-11-13).
+  * `margin_rate_variance_mv` YAML (8): vendor_id, vendor_name, vendor_type, circuit_id, invoice_number, is_overbilled, extraction_method, source_pdf_path.
+* Add any new ID/string/boolean dimension to this register in the same change that adds it.
 * Contribution margin is defined only in `margin_ledger_mv`; other views must not redefine it.
 
 Worked example:
