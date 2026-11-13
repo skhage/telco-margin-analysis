@@ -42,6 +42,23 @@ GRANT USE SCHEMA, SELECT ON SCHEMA cdm_tmforum._metrics TO `lakelink-margin-groo
 DELETE FROM public.approval_tickets WHERE ticket_id = 'TEST-GROOM-4d4c099b0e';
 ```
 
+## CEO interactive session (COO-Q-20261113-47, @pm 2026-11-13 run #12)
+
+The Genie Code Auto Mode guardrail blocks these in scheduled runs, so the CEO has to run them in ONE interactive Genie Code session or the matching UI. This section is in this sheet (not in a new file) because of the consolidation rule. About 25 minutes total. Slot: Nov 14 (before 18:00 UTC) is preferred. Nov 17 rehearsal is the last slot.
+
+| # | Item (task) | Exact action | Expected before -> after | Rollback | Min | Board confirmer |
+| --- | --- | --- | --- | --- | --- | --- |
+| I1 | Scene 3 live rule change (COO-Q-20261113-23, -41) | `UPDATE cdm_tmforum.revenue_assurance.margin_allocation_rules SET weight=0.900000 WHERE rule_id='MGN-ALR-customer_care-ticket_count-v1' AND weight=0.700000;` then check the MV, Margin Genie, dashboard and app explorer | `MEASURE(contribution_margin)` 2,375,095,705.09 -> 2,360,713,702.39 | `UPDATE ... SET weight=0.700000 WHERE rule_id='MGN-ALR-customer_care-ticket_count-v1';` gives MV 2,375,095,705.09 again, rules checksum c4ae4e2bf5df1fca7109e22bc80314d5f5a98ae31e008106df2bd822abb94ff3 | 10 | @qa (COO-Q-20261113-41) |
+| I2 | MV v1.2 ALTER (DA-MV-V12-DEPLOY) | NOT REQUIRED. DEC-028 freezes v1.1 for the demo. Nothing to run. | v1.1 stays at 2,375,095,705.09 | n/a (rollback file margin_ledger_mv_v1_1_rollback.yaml kept) | 0 | @data-analyst |
+| I3 | Stale pipeline (DE-DELETE-STALE-PIPELINE, gate 8) | In the Pipelines UI, delete ccea7e91-e657-4168-82fe-588f4e6437d5 (NOT 20960984) | pipelines LIKE %margin% 2 -> 1 | none (IDLE, owns 0 UC datasets) | 1 | @data-engineer, then @repo-pruner removes notebook 1551722662311991 |
+| I4 | TEST ticket (gate 6) | SQL D below on the app Lakebase | 1 TEST row -> 0 | optional, the UI filter already hides it | 1 | @ml-engineer |
+| I5 | App SP grants + redeploy (gates 1-2) | SQL A below, then Deploy lakelink-margin-truth | SP privileges false -> true; new active_deployment id | REVOKE the same grants | 5 | @app-developer |
+| I6 | Agent SP (gate 3) | Command B below | trace identity user -> SP | remove SP | 4 | @ml-engineer |
+| I7 | Leave-behind jobs (P6-DAB-DEPLOY) | Web terminal, from bundle/: `databricks bundle deploy -t jobs_only` | 0 -> 4 lakelink-margin-* jobs | `databricks bundle destroy -t jobs_only` | 3 | @devops |
+| I8 | Genie One capture (gate 5) | Steps C below | 2 screenshots | n/a | 3 | @qa |
+
+If I1 has not run by Nov 15 12:00 CT, scene 3 is DESCOPED to definition plus simulation (DEC-027(3)). Other cutoffs follow DEC-018.
+
 ## Scene readiness matrix (refreshed 2026-11-13 06:10 UTC, replaces COO-Q-20261113-21)
 
 Update 2026-11-13 @pm run #9: gate 4 closed; P2-GLOSSARY-PAGES and P2-DISCOVER-DOMAINS unblocked. COO review #15 reports Margin Genie with 9 sources (5 MVs + 4 dims) and 13/13 benchmarks passing, so S4 no longer waits on the MVs being added as Genie sources.
@@ -51,7 +68,7 @@ Update 2026-11-13 @pm run #9: gate 4 closed; P2-GLOSSARY-PAGES and P2-DISCOVER-D
 | S1 Question (Genie, CFO) | GO (Margin Genie); Genie One AT RISK | Genie 01f1df115a08164aab3ae5f6faac807c, Finance starter exact to the cent (@qa 05:42 UTC) | Gate 5 | Nov 14 18:00 UTC |
 | S2 Answer -> ledger -> lineage -> PDF | GO | margin_ledger_allocated repointed to margin_ledger_v2, MV = 2,375,095,705.09 | none (lineage audit P5-LINEAGE-AUDIT open @qa) | fast path stays canonical if v2 drifts |
 | S3 Metric view + live rule change | GO (simulated), live UPDATE at rehearsal | read-only sim: 0.70->0.90 gives 2,360,713,702.39 (@ml-engineer) | rehearsal UPDATE | Nov 17 -> pre-recorded clip |
-| S4 One Genie Ops/Sales/Marketing | AT RISK | 4 suite MVs live (offnet 47, renewal 586, segment DEC-013) but NOT yet in Genie data_sources | none (agent work: COO-Q-20261113-22, P3-GENIE-BENCHMARKS) | Nov 15 12:00 CT -> answer from margin_ledger_mv + dims |
+| S4 One Genie Ops/Sales/Marketing | GO on accuracy, display FIX open (run #12) | 9 Genie sources, 13/13 benchmark SQLs correct; pct/USD/boolean display fails (DSN-GENIE-FORMAT-R2); Ops label DEC-026 (DA-OPS-SAVINGS-LABEL-FIX) | none (agent work) | Nov 15 12:00 CT -> answer from margin_ledger_mv + dims |
 | S5 Grooming agent -> approval app | NO-GO live | agent GO (47 candidates, heroes 45040/98532); app SP has zero table privileges | Gates 1, 2, 6 | Nov 15 12:00 CT -> recorded scene 5 |
 | S6 Trace / SP / audit | CONDITIONAL | trace tr-f09d04073ced6c20fad2e0100ad00eb2 (user identity) | Gate 3 | Nov 15 12:00 CT -> user-identity trace |
 | S7 $1B Wall cards | AT RISK | dashboard 01f1df1950c51bd68e87ace31632c2bf p2 live on wall MV | none | P6-CHALLENGE-CARDS due Nov 16 12:00 CT |
