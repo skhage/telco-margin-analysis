@@ -32,7 +32,8 @@ const DIMENSIONS: [string, string][] = [
   ["product_family", "Product Family"], ["family_class", "Legacy or Strategic"], ["segment", "Customer Segment"],
   ["region", "Sales Region"], ["network_type", "Network Type"], ["ledger_quarter", "Quarter"], ["vendor_id", "Vendor ID"],
 ];
-const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+// DEC-030: every USD value to the cent (2 dp) so the CM string matches Genie/dashboard/agent exactly
+const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 // Missing values: em dash announced as 'not available' (DS-APP-UX-POLISH item 2)
 const NotAvailable = () => <span role="img" aria-label="not available">—</span>;
 const orNA = (v: ReactNode | null | undefined): ReactNode => (v == null || v === "" ? <NotAvailable /> : v);
