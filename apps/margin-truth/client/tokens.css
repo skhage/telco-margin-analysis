@@ -43,7 +43,7 @@ main { padding: var(--llf-space-3); max-width: 1280px; margin: 0 auto; }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: var(--llf-space-1); border-bottom: 1px solid var(--llf-border); font-variant-numeric: tabular-nums; }
 th { color: var(--llf-muted); font-weight: 600; font-size: 13px; }
-td.num, th.num { text-align: right; }
+td.num, th.num { text-align: right; white-space: nowrap; overflow-wrap: normal; }
 .neg { color: var(--llf-negative); font-weight: 600; }
 /* APP-EXPLORER-TOTAL-ROW: portfolio total footer (text color for AA, strong top rule, tokens only) */
 .llf-total th, .llf-total td { color: var(--llf-text); font-weight: 700; font-size: inherit; border-top: 2px solid var(--llf-secondary); border-bottom: 0; }
