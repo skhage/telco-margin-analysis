@@ -1,0 +1,143 @@
+# Lakelink Fiber Margin Truth - metric view margin_renewal_floor_mv v1.0 (P2-MV-SUITE, @data-analyst, 2026-11-13)
+# Deployed to cdm_tmforum._metrics.margin_renewal_floor_mv (DEC-001, DEC-019). TBLPROPERTIES telco_project=margin_analysis.
+# Later edits: ALTER VIEW ... AS <body without these # lines>. Expected: renewals 1,377; below floor 586; CM 2,375,095,705.09.
+version: 1.1
+comment: >-
+  Lakelink Fiber renewal margin-floor metrics. Grain: one row per contract line that has ledger activity.
+  Contribution margin and CM % come from MEASURE() over cdm_tmforum._metrics.margin_ledger_mv (DEC-002, DEC-020); they are not redefined here.
+  Below floor = CM % < product margin_floor_pct. Renewal window = term_end within 90 days of the demo as-of date 2026-11-19 (DEC-019).
+  Sales starter question: which renewals in the next 90 days are below the margin floor? Synonyms: renewals, margin floor, at-risk renewals.
+source: |-
+  SELECT c.contract_id, c.customer_id, cu.customer_name, cu.segment, cu.region, c.product_id, p.product_name, p.product_family,
+         INITCAP(p.family_class) AS family_class, c.term_end, c.is_auto_renew, p.margin_floor_pct,
+         cm.revenue_usd, cm.contribution_margin_usd, cm.cm_pct,
+         (c.term_end BETWEEN DATE'2026-11-19' AND DATE'2026-11-19' + 90) AS is_renewal_next_90d,
+         (cm.cm_pct < p.margin_floor_pct) AS is_below_floor
+  FROM cdm_tmforum.revenue_assurance.margin_contracts c
+  JOIN cdm_tmforum.revenue_assurance.margin_products p ON p.product_id = c.product_id
+  LEFT JOIN cdm_tmforum.revenue_assurance.margin_customers cu ON cu.customer_id = c.customer_id
+  JOIN (SELECT contract_id, MEASURE(revenue) AS revenue_usd, MEASURE(contribution_margin) AS contribution_margin_usd,
+               MEASURE(cm_pct) AS cm_pct
+        FROM cdm_tmforum._metrics.margin_ledger_mv GROUP BY contract_id) cm ON cm.contract_id = c.contract_id
+dimensions:
+  - name: contract_id
+    expr: contract_id
+    display_name: Contract Line ID
+    comment: "Contract line identifier (Salesforce contract_line_item Id)."
+    synonyms: [contract, contract line, deal]
+  - name: customer_id
+    expr: customer_id
+    display_name: Customer ID
+    comment: "Lakelink Fiber customer on the contract line."
+    synonyms: [account id, customer]
+  - name: customer_name
+    expr: customer_name
+    display_name: Customer
+    comment: "Fictional customer account name."
+    synonyms: [account, account name, client]
+  - name: segment
+    expr: segment
+    display_name: Segment
+    comment: "Customer market segment."
+    synonyms: [customer segment, market segment]
+  - name: region
+    expr: region
+    display_name: Region
+    comment: "Customer sales region."
+    synonyms: [territory, geography]
+  - name: product_id
+    expr: product_id
+    display_name: Product ID
+    comment: "Product on the contract line."
+    synonyms: [product code]
+  - name: product_name
+    expr: product_name
+    display_name: Product
+    comment: "Product name."
+    synonyms: [service, offer]
+  - name: product_family
+    expr: product_family
+    display_name: Product Family
+    comment: "Product family (for example Wavelength, Ethernet, Legacy Voice)."
+    synonyms: [family, product line]
+  - name: family_class
+    expr: family_class
+    display_name: Legacy or Strategic
+    comment: "Family class from the product family: Legacy or Strategic."
+    synonyms: [legacy, strategic, family class]
+  - name: term_end
+    expr: term_end
+    display_name: Term End
+    comment: "Contract term end date, the renewal date."
+    format: {type: date, date_format: year_month_day}
+    synonyms: [renewal date, expiration date, contract end]
+  - name: is_auto_renew
+    expr: is_auto_renew
+    display_name: Auto Renew
+    comment: "TRUE when the contract line renews automatically."
+    synonyms: [auto renewal, evergreen]
+  - name: is_renewal_next_90d
+    expr: is_renewal_next_90d
+    display_name: Renews in Next 90 Days
+    comment: "TRUE when term_end is between 2026-11-19 (demo as-of date) and 90 days later (DEC-019)."
+    synonyms: [upcoming renewal, renewal window, next 90 days]
+  - name: is_below_floor
+    expr: is_below_floor
+    display_name: Below Margin Floor
+    comment: "TRUE when the contract line CM % (from margin_ledger_mv) is below the product margin floor."
+    synonyms: [below floor, under floor, at risk]
+  - name: margin_floor_pct
+    expr: margin_floor_pct
+    display_name: Margin Floor %
+    comment: "Minimum acceptable contribution margin % for the product (0-1 fraction)."
+    format: {type: percentage, decimal_places: {type: exact, places: 1}}
+    synonyms: [margin floor, floor, minimum margin]
+  - name: contract_cm_pct
+    expr: cm_pct
+    display_name: Contract CM %
+    comment: "Lifetime contribution margin % of the contract line from MEASURE(cm_pct) in margin_ledger_mv (0-1 fraction)."
+    format: {type: percentage, decimal_places: {type: exact, places: 1}}
+    synonyms: [contract margin, deal margin %]
+measures:
+  - name: contract_count
+    expr: COUNT(DISTINCT contract_id)
+    display_name: Contract Lines
+    comment: "Number of distinct contract lines with ledger activity."
+    format: {type: number, decimal_places: {type: exact, places: 0}}
+    synonyms: [contracts, deals]
+  - name: renewal_count
+    expr: COUNT(DISTINCT contract_id) FILTER (WHERE is_renewal_next_90d)
+    display_name: Renewals (Next 90 Days)
+    comment: "Contract lines renewing in the 90 days after 2026-11-19 that have ledger activity."
+    format: {type: number, decimal_places: {type: exact, places: 0}}
+    synonyms: [upcoming renewals]
+  - name: below_floor_renewal_count
+    expr: COUNT(DISTINCT contract_id) FILTER (WHERE is_renewal_next_90d AND is_below_floor)
+    display_name: Below-floor Renewals
+    comment: "Renewals in the next 90 days whose CM % is below the margin floor (Sales benchmark, DEC-019 expected 586)."
+    format: {type: number, decimal_places: {type: exact, places: 0}}
+    synonyms: [at-risk renewals, renewals below floor, below margin floor renewals]
+  - name: renewal_revenue
+    expr: SUM(revenue_usd) FILTER (WHERE is_renewal_next_90d)
+    display_name: Renewal Revenue
+    comment: "Lifetime ledger revenue of renewing contract lines, US dollars (from MEASURE(revenue))."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [revenue up for renewal]
+  - name: below_floor_renewal_revenue
+    expr: SUM(revenue_usd) FILTER (WHERE is_renewal_next_90d AND is_below_floor)
+    display_name: Below-floor Renewal Revenue
+    comment: "Lifetime ledger revenue of below-floor renewals, US dollars."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [at-risk revenue]
+  - name: below_floor_renewal_cm
+    expr: SUM(contribution_margin_usd) FILTER (WHERE is_renewal_next_90d AND is_below_floor)
+    display_name: Below-floor Renewal Contribution Margin
+    comment: "Contribution margin (from margin_ledger_mv) of below-floor renewals, US dollars."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [at-risk margin]
+  - name: contribution_margin
+    expr: SUM(contribution_margin_usd)
+    display_name: Contribution Margin
+    comment: "Sum of contract-line contribution margin taken from MEASURE(contribution_margin) in margin_ledger_mv, US dollars. Not redefined."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [CM, margin]

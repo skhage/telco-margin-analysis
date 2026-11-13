@@ -481,18 +481,16 @@
     },
     {
       "name": "ds_wall_kpis",
-      "displayName": "$1B Wall KPIs (placeholder)",
+      "displayName": "$1B Wall KPIs",
       "queryLines": [
-        "-- PLACEHOLDER (DSN-DASH-SKELETON): replace with cdm_tmforum._metrics.margin_onebillion_wall_mv when P2-MV-SUITE lands. $1B Wall definition comes from its glossary page; @designer does not define it.\n",
-        "SELECT CAST(NULL AS DECIMAL(18,2)) AS wall_target, CAST(NULL AS DECIMAL(18,2)) AS identified_value, CAST(NULL AS DECIMAL(18,2)) AS gap_to_wall, CAST(NULL AS DECIMAL(9,4)) AS progress_pct\n"
+        "SELECT MEASURE(wall_target) AS wall_target, MEASURE(identified_savings) AS identified_value, MEASURE(gap_to_wall) AS gap_to_wall, MEASURE(wall_progress_pct) AS progress_pct FROM cdm_tmforum._metrics.margin_onebillion_wall_mv"
       ]
     },
     {
       "name": "ds_wall_levers",
-      "displayName": "$1B Wall levers (placeholder)",
+      "displayName": "$1B Wall levers",
       "queryLines": [
-        "-- PLACEHOLDER (DSN-DASH-SKELETON): replace with cdm_tmforum._metrics.margin_onebillion_wall_mv when P2-MV-SUITE lands. $1B Wall definition comes from its glossary page; @designer does not define it.\n",
-        "SELECT lever, CAST(NULL AS DECIMAL(18,2)) AS identified_value, owner_persona, source_metric_view FROM VALUES ('Off-net grooming savings','Ops','margin_offnet_spend_mv'),('Revenue Leakage','Finance','margin_ledger_mv'),('Carrier Rate Variance','Finance','margin_rate_variance_mv'),('Legacy repricing','Sales','margin_ledger_mv') AS t(lever, owner_persona, source_metric_view)\n"
+        "SELECT lever, owner_persona, source_metric AS source_metric_view, MEASURE(identified_savings) AS identified_value FROM cdm_tmforum._metrics.margin_onebillion_wall_mv GROUP BY ALL ORDER BY identified_value DESC"
       ]
     },
     {

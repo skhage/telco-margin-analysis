@@ -16,7 +16,7 @@ env:
     value: "cdm_tmforum._metrics.margin_ledger_mv"
   # Margin Genie (set when P3-MARGIN-GENIE creates the ONE space)
   - name: GENIE_SPACE_ID
-    value: ""
+    value: "01f1df115a08164aab3ae5f6faac807c"
   - name: MLFLOW_EXPERIMENT_ID
     value: "1235449331932066"
   # APP-HIDE-TEST-TICKETS: hide TEST-* tickets from queue/decision/evidence (non-destructive; set "true" to show)

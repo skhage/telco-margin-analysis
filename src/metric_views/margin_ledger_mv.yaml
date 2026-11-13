@@ -5,6 +5,12 @@
 #          ALTER VIEW ... SET TAGS ('telco_project' = 'margin_analysis')
 # Later edits: ALTER VIEW ... AS $$ ... $$ (keeps grants), never CREATE OR REPLACE.
 # Contribution margin is defined ONLY here. Every other view, Genie, dashboard, app and agent reads MEASURE(contribution_margin).
+# v1.2 YAML (2026-11-13, @data-planner, DP-MV-GLOSSARY-FIELDS + DA-MV-VENDOR-NAME-DIM + DP-MV-INITCAP-FAMILY): PENDING ALTER VIEW by @data-analyst.
+#   Adds many-to-one joins circuit/product/vendor (PK-backed, 517,032 rows before and after join, 0 orphans) and fields
+#   is_parallel_to_onnet_fiber, grooming_scope, margin_floor_pct, vendor_name, family_class_label, measure care_ticket_count.
+#   Measures and CM definition unchanged; expected MEASURE(contribution_margin) still 2,375,095,705.09.
+#   Cost pool and driver are rule-level (margin_allocation_rules, 8 active rules) and cannot be ledger-grain dimensions without fan-out;
+#   they are documented in the cost_to_serve / allocation_rule_version comments and synonyms.
 version: 1.1
 comment: >-
   Lakelink Fiber margin ledger metrics. Grain of the source: customer x product x circuit x month.
@@ -12,6 +18,17 @@ comment: >-
   Cost to serve is allocated by margin_allocation_rules, so a rule change moves every answer.
   Synonyms: margin ledger, P&L by circuit, profitability.
 source: cdm_tmforum.revenue_assurance.margin_ledger_allocated
+
+joins:
+  - name: circuit
+    source: cdm_tmforum.revenue_assurance.margin_circuits
+    'on': source.circuit_id = circuit.circuit_id
+  - name: product
+    source: cdm_tmforum.revenue_assurance.margin_products
+    'on': source.product_id = product.product_id
+  - name: vendor
+    source: cdm_tmforum.revenue_assurance.margin_vendors
+    'on': source.vendor_id = vendor.vendor_id
 
 dimensions:
   - name: ledger_month
@@ -60,6 +77,11 @@ dimensions:
     display_name: Legacy or Strategic
     comment: "strategic or legacy, taken from the product family. Legacy = IP-VPN (MPLS) and Legacy Voice; all others strategic."
     synonyms: [legacy vs strategic, portfolio class, product class]
+  - name: family_class_label
+    expr: INITCAP(family_class)
+    display_name: Portfolio Class
+    comment: "Title-case display value of family_class: Legacy or Strategic. Legacy family = IP-VPN (MPLS) and Legacy Voice; strategic family = all other product families. Use for charts and tables."
+    synonyms: [legacy family, strategic family, Legacy or Strategic label]
   - name: contract_id
     expr: contract_id
     display_name: Contract Line ID
@@ -85,11 +107,34 @@ dimensions:
     display_name: Vendor ID
     comment: "Third-party carrier for off-net circuits (Salesforce partner_account Id from margin_vendors, DEC-003); NULL when on-net."
     synonyms: [carrier, supplier, provider]
+  - name: vendor_name
+    expr: vendor.vendor_name
+    display_name: Vendor
+    comment: "Name of the third-party carrier an off-net circuit rides (margin_vendors.vendor_name); NULL when the circuit is on-net."
+    synonyms: [carrier, supplier, carrier name, vendor name]
+  - name: is_parallel_to_onnet_fiber
+    expr: circuit.is_parallel_to_onnet_fiber
+    display_name: Runs Next to Own Fiber
+    comment: "TRUE = the circuit route runs next to Lakelink Fiber's own fiber (margin_circuits), so an off-net circuit could be groomed on-net."
+    synonyms: [parallel to own fiber, next to our fiber, adjacent fiber, near on-net]
+  - name: grooming_scope
+    expr: "CASE WHEN NOT is_on_net AND circuit.is_parallel_to_onnet_fiber THEN 'Grooming scope' WHEN NOT is_on_net THEN 'Off-net, no parallel fiber' ELSE 'On-net' END"
+    display_name: Grooming Scope
+    comment: "Grooming = moving an off-net circuit onto Lakelink Fiber's own network. 'Grooming scope' = off-net AND runs next to own fiber. The final grooming candidates (DEC-017) also need margin_score_onnet_move savings > 0, which this dimension does not apply."
+    synonyms: [grooming, groom on-net, on-net move, grooming candidate pool]
+  - name: margin_floor_pct
+    expr: product.margin_floor_pct
+    display_name: Margin Floor %
+    comment: "Minimum acceptable contribution margin % for the product (margin_products.margin_floor_pct, 0.20 = 20%). Compare cm_pct with this value; a renewal below the floor has cm_pct < margin_floor_pct (DEC-019)."
+    format:
+      type: percentage
+      decimal_places: {type: exact, places: 1}
+    synonyms: [margin floor, floor, minimum margin, target margin]
   - name: allocation_rule_version
     expr: allocation_rule_version
     display_name: Allocation Rule Version
-    comment: "Version of margin_allocation_rules used to compute cost to serve for this row."
-    synonyms: [rule set, allocation version]
+    comment: "Version of margin_allocation_rules used to compute cost to serve for this row. An allocation rule assigns a share (weight) of a cost pool to circuits by a driver."
+    synonyms: [rule set, allocation version, allocation rule]
 
 measures:
   - name: revenue
@@ -115,13 +160,13 @@ measures:
   - name: cost_to_serve
     expr: SUM(cost_to_serve_usd)
     display_name: Cost to Serve
-    comment: "Operating cost allocated to the circuit by margin_allocation_rules (cost pool x driver x weight), US dollars."
+    comment: "Operating cost allocated to the circuit by margin_allocation_rules (cost pool x driver x weight), US dollars. Cost pools: field_ops, noc, customer_care, billing_ops. Drivers: circuit_count, bandwidth_mbps, ticket_count, billed_revenue."
     format:
       type: currency
       currency_code: USD
       decimal_places: {type: exact, places: 0}
       abbreviation: compact
-    synonyms: [CTS, servicing cost, allocated opex, support cost]
+    synonyms: [CTS, servicing cost, allocated opex, support cost, cost pool allocation]
   - name: contribution_margin
     expr: MEASURE(revenue) - MEASURE(network_expense) - MEASURE(cost_to_serve)
     display_name: Contribution Margin
@@ -200,3 +245,13 @@ measures:
       hide_group_separator: false
       abbreviation: compact
     synonyms: [number of customers, accounts]
+  - name: care_ticket_count
+    expr: SUM(ticket_count)
+    display_name: Care Tickets
+    comment: "Customer care tickets, the ticket_count driver for the customer_care cost pool. Synthetic deterministic proxy (DEC-016), not real trouble tickets."
+    format:
+      type: number
+      decimal_places: {type: exact, places: 0}
+      hide_group_separator: false
+      abbreviation: compact
+    synonyms: [tickets, trouble tickets, care driver, allocation driver]

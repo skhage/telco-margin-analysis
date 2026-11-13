@@ -1,0 +1,84 @@
+# Lakelink Fiber Margin Truth - metric view margin_segment_growth_mv v1.0 (P2-MV-SUITE, @data-analyst, 2026-11-13)
+# Deployed to cdm_tmforum._metrics.margin_segment_growth_mv (DEC-001, DEC-013). TBLPROPERTIES telco_project=margin_analysis.
+# Later edits: ALTER VIEW ... AS <body without these # lines>. Expected: CM 2,375,095,705.09; room to grow = Commercial only.
+version: 1.1
+comment: >-
+  Lakelink Fiber segment growth metrics for the Marketing persona. Grain: one row per customer segment.
+  Revenue, contribution margin, CM % and customer count come from MEASURE() over cdm_tmforum._metrics.margin_ledger_mv (DEC-002); CM is not redefined here.
+  Room to grow (DEC-013) = segment CM % above the portfolio CM % AND revenue share below customer-count share.
+  Marketing starter question: which segments have the highest margin and the most room to grow? Synonyms: segment margin, growth headroom.
+source: |-
+  WITH s AS (
+    SELECT segment, MEASURE(revenue) AS revenue_usd, MEASURE(contribution_margin) AS contribution_margin_usd,
+           MEASURE(cm_pct) AS segment_cm_pct, MEASURE(customer_count) AS customers
+    FROM cdm_tmforum._metrics.margin_ledger_mv GROUP BY segment),
+  t AS (
+    SELECT MEASURE(revenue) AS total_revenue_usd, MEASURE(cm_pct) AS portfolio_cm_pct, MEASURE(customer_count) AS total_customers
+    FROM cdm_tmforum._metrics.margin_ledger_mv)
+  SELECT s.segment, s.revenue_usd, s.contribution_margin_usd, s.segment_cm_pct, s.customers,
+         t.total_revenue_usd, t.portfolio_cm_pct, t.total_customers,
+         s.revenue_usd / t.total_revenue_usd AS revenue_share,
+         s.customers / t.total_customers AS customer_share,
+         CASE WHEN s.segment_cm_pct > t.portfolio_cm_pct AND s.revenue_usd / t.total_revenue_usd < s.customers / t.total_customers
+              THEN 'Yes' ELSE 'No' END AS room_to_grow
+  FROM s CROSS JOIN t
+dimensions:
+  - name: segment
+    expr: segment
+    display_name: Segment
+    comment: "Customer market segment."
+    synonyms: [customer segment, market segment, vertical]
+  - name: room_to_grow
+    expr: room_to_grow
+    display_name: Room to Grow
+    comment: "Yes when segment CM % is above the portfolio CM % and its revenue share is below its customer-count share (DEC-013); otherwise No."
+    synonyms: [growth headroom, upsell room, most room to grow]
+  - name: portfolio_cm_pct
+    expr: portfolio_cm_pct
+    display_name: Portfolio CM %
+    comment: "Contribution margin % across all segments, MEASURE(cm_pct) from margin_ledger_mv (0-1 fraction)."
+    format: {type: percentage, decimal_places: {type: exact, places: 1}}
+    synonyms: [portfolio average margin, overall margin %]
+measures:
+  - name: revenue
+    expr: SUM(revenue_usd)
+    display_name: Revenue
+    comment: "Segment revenue from MEASURE(revenue) in margin_ledger_mv, US dollars."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [sales, billed revenue]
+  - name: contribution_margin
+    expr: SUM(contribution_margin_usd)
+    display_name: Contribution Margin
+    comment: "Segment contribution margin from MEASURE(contribution_margin) in margin_ledger_mv, US dollars. Not redefined."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [CM, margin, profit after cost to serve]
+  - name: cm_pct
+    expr: MEASURE(contribution_margin) / NULLIF(MEASURE(revenue), 0)
+    display_name: Contribution Margin %
+    comment: "Contribution margin divided by revenue for the selected segments (0-1 fraction)."
+    format: {type: percentage, decimal_places: {type: exact, places: 1}}
+    synonyms: [margin %, CM %, margin rate]
+  - name: customer_count
+    expr: SUM(customers)
+    display_name: Customers
+    comment: "Distinct customers with ledger activity in the segment (segments do not overlap)."
+    format: {type: number, decimal_places: {type: exact, places: 0}}
+    synonyms: [accounts, customer count]
+  - name: revenue_share
+    expr: SUM(revenue_usd) / ANY_VALUE(total_revenue_usd)
+    display_name: Revenue Share
+    comment: "Selected segments' share of total portfolio revenue (0-1 fraction)."
+    format: {type: percentage, decimal_places: {type: exact, places: 1}}
+    synonyms: [share of revenue, wallet share]
+  - name: customer_share
+    expr: SUM(customers) / ANY_VALUE(total_customers)
+    display_name: Customer Share
+    comment: "Selected segments' share of all customers (0-1 fraction)."
+    format: {type: percentage, decimal_places: {type: exact, places: 1}}
+    synonyms: [share of customers]
+  - name: room_to_grow_segment_count
+    expr: COUNT(DISTINCT segment) FILTER (WHERE room_to_grow = 'Yes')
+    display_name: Segments with Room to Grow
+    comment: "Number of segments flagged room to grow (DEC-013)."
+    format: {type: number, decimal_places: {type: exact, places: 0}}
+    synonyms: [growth segments]

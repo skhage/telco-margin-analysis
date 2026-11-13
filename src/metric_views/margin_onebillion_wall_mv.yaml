@@ -1,0 +1,87 @@
+# Lakelink Fiber Margin Truth - metric view margin_onebillion_wall_mv v1.0 (P2-MV-SUITE, @data-analyst, 2026-11-13)
+# Deployed to cdm_tmforum._metrics.margin_onebillion_wall_mv (DEC-001, DEC-022). TBLPROPERTIES telco_project=margin_analysis.
+# Later edits: ALTER VIEW ... AS <body without these # lines>. Expected: identified 61,253,174.38; gap 938,746,825.62; baseline CM 2,375,095,705.09.
+version: 1.1
+comment: >-
+  Lakelink Fiber $1B Wall tracker. Grain: one row per margin-improvement lever. The $1B Wall is the target of USD 1,000,000,000
+  in annualized contribution margin improvement, tracked by lever (glossary term $1B Wall). Every lever value comes from MEASURE() over
+  the margin_ metric views (margin_ledger_mv, margin_offnet_spend_mv, margin_renewal_floor_mv); contribution margin is never redefined (DEC-002).
+  The ledger window is the 12 months Nov 2025 - Oct 2026, so ledger sums are annual values. baseline_contribution_margin ties to
+  MEASURE(contribution_margin) in margin_ledger_mv (2,375,095,705.09 at default rules, DEC-020).
+  Synonyms: $1B Wall, billion dollar wall, 1B wall, margin improvement target, levers.
+source: |-
+  WITH base AS (SELECT MEASURE(contribution_margin) AS baseline_cm FROM cdm_tmforum._metrics.margin_ledger_mv),
+  levers AS (
+    SELECT 1 AS lever_rank, 'Off-net grooming' AS lever, 'Ops' AS owner_persona, 'margin_offnet_spend_mv.est_annual_savings' AS source_metric,
+           MEASURE(est_annual_savings) AS identified_usd FROM cdm_tmforum._metrics.margin_offnet_spend_mv
+    UNION ALL
+    SELECT 2, 'Revenue leakage recovery', 'Finance', 'margin_ledger_mv.revenue_leakage', MEASURE(revenue_leakage)
+    FROM cdm_tmforum._metrics.margin_ledger_mv
+    UNION ALL
+    SELECT 3, 'Carrier rate variance recovery', 'Ops', 'margin_ledger_mv.carrier_rate_variance', MEASURE(carrier_rate_variance)
+    FROM cdm_tmforum._metrics.margin_ledger_mv
+    UNION ALL
+    SELECT 4, 'Legacy repricing', 'Finance', 'margin_ledger_mv.contribution_margin (loss-making legacy families)', -SUM(cm)
+    FROM (SELECT product_family, MEASURE(contribution_margin) AS cm FROM cdm_tmforum._metrics.margin_ledger_mv
+          WHERE family_class = 'legacy' GROUP BY product_family) WHERE cm < 0
+    UNION ALL
+    SELECT 5, 'Renewal margin floor', 'Sales', 'margin_renewal_floor_mv (floor gap x revenue, below-floor renewals)',
+           SUM((margin_floor_pct - contract_cm_pct) * renewal_revenue)
+    FROM (SELECT contract_id, margin_floor_pct, contract_cm_pct, MEASURE(renewal_revenue) AS renewal_revenue
+          FROM cdm_tmforum._metrics.margin_renewal_floor_mv WHERE is_renewal_next_90d AND is_below_floor GROUP BY ALL))
+  SELECT l.lever_rank, l.lever, l.owner_persona, l.source_metric, CAST(l.identified_usd AS DECIMAL(18,2)) AS identified_usd,
+         CAST(1000000000 AS DECIMAL(18,2)) AS wall_target_usd, b.baseline_cm
+  FROM levers l CROSS JOIN base b
+dimensions:
+  - name: lever
+    expr: lever
+    display_name: Lever
+    comment: "Margin-improvement lever: Off-net grooming, Revenue leakage recovery, Carrier rate variance recovery, Legacy repricing, Renewal margin floor."
+    synonyms: [margin lever, savings lever, initiative]
+  - name: lever_rank
+    expr: lever_rank
+    display_name: Lever Order
+    comment: "Fixed display order of the lever (1-5)."
+    format: {type: number, decimal_places: {type: exact, places: 0}}
+    synonyms: [lever number]
+  - name: owner_persona
+    expr: owner_persona
+    display_name: Owner Persona
+    comment: "Persona that owns the lever: Finance, Ops, or Sales."
+    synonyms: [owner, team, persona]
+  - name: source_metric
+    expr: source_metric
+    display_name: Source Metric
+    comment: "Metric view and measure the lever value comes from."
+    synonyms: [source, lineage]
+measures:
+  - name: wall_target
+    expr: ANY_VALUE(wall_target_usd)
+    display_name: $1B Wall Target
+    comment: "The $1B Wall: USD 1,000,000,000 annualized contribution margin improvement target."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [$1B Wall, billion dollar wall, target]
+  - name: identified_savings
+    expr: SUM(identified_usd)
+    display_name: Identified So Far
+    comment: "Annualized contribution margin improvement identified by the selected levers, US dollars."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [identified, lever value, savings identified, progress]
+  - name: gap_to_wall
+    expr: MEASURE(wall_target) - MEASURE(identified_savings)
+    display_name: Gap to the Wall
+    comment: "$1B Wall target minus identified savings, US dollars remaining."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [remaining, gap, distance to the wall]
+  - name: wall_progress_pct
+    expr: MEASURE(identified_savings) / MEASURE(wall_target)
+    display_name: Progress to the Wall %
+    comment: "Identified savings as a share of the $1B Wall target (0-1 fraction)."
+    format: {type: percentage, decimal_places: {type: exact, places: 1}}
+    synonyms: [progress, percent to target]
+  - name: baseline_contribution_margin
+    expr: ANY_VALUE(baseline_cm)
+    display_name: Baseline Contribution Margin
+    comment: "Current 12-month contribution margin, MEASURE(contribution_margin) from margin_ledger_mv; ties to the canonical total (DEC-020)."
+    format: {type: currency, currency_code: USD, decimal_places: {type: exact, places: 0}, abbreviation: compact}
+    synonyms: [current margin, CM baseline]
