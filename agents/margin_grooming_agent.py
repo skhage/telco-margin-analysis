@@ -33,8 +33,8 @@ offnet_grooming ticket already exists for the circuit, so re-runs never duplicat
 
 SCENE-6 HERO TRACE (COO-Q-20261113-28 / QA-F-TRACE-SUITE-MV-R1, 2026-11-13): DRY_RUN trace
 tr-7e87cf4df0dfdbf4a2ae39e1f1ab0478 - ask_margin_genie genie_basis=margin_genie, Genie SQL FROM
-cdm_tmforum._metrics.margin_offnet_spend_mv WHERE is_grooming_candidate, total_row_count=47 (= 412,539.96 annual,
-same as the scene-4 Ops answer); dedup returned GROOM-44c3612b69 / GROOM-6d8f8ce31e, 0 new tickets.
+cdm_tmforum._metrics.margin_offnet_spend_mv WHERE is_grooming_candidate, total_row_count=47 (same 47 candidates as the
+scene-4 Ops answer: annual off-net cost 1,152,342.12, est. annual savings 412,539.96, DEC-026); dedup returned GROOM-44c3612b69 / GROOM-6d8f8ce31e, 0 new tickets.
 Ask Genie the exact scene-4 Ops question so it routes to the suite MV.
 """
 import json, time, uuid

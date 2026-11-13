@@ -79,7 +79,7 @@ Each value was verified twice: by raw SQL on `margin_ledger_allocated` and the b
 | Persona | Question | Expected answer |
 |---|---|---|
 | Finance | Which product families lost money after cost to serve last quarter? | 2 families in 2026 Q3: IP-VPN -6,715,475.88 and Legacy Voice -249,532.74 (both legacy). Q3 portfolio CM 590,767,062.41 |
-| Ops | Which off-net circuits run next to our own fiber, and what do we pay for them? | 47 grooming candidates (Margin Genie row count 47); estimated savings 412,539.96 per year (raw function check) |
+| Ops | Which off-net circuits run next to our own fiber, and what do we pay for them? | 47 grooming candidates (Margin Genie row count 47); what we pay = annual off-net cost 1,152,342.12 (MEASURE(monthly_offnet_cost) x 12 on margin_offnet_spend_mv); est. annual savings if moved on-net = 412,539.96 (raw function check). 412,539.96 is savings, never spend (DEC-026) |
 | Sales | Which renewals in the next 90 days are below the margin floor? | 586 below floor out of 1,490 renewals (1,377 with ledger rows), as of 2026-11-19 |
 | Marketing | Which segments have the highest margin and the most room to grow? | Commercial: CM 54.35% vs portfolio 54.14%, revenue share 34.43% below customer share 34.46%. The only segment with room to grow |
 

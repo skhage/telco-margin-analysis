@@ -246,3 +246,9 @@ Terms (16): contribution margin, revenue, network expense, cost to serve, alloca
 ## 7. Discover domain structure
 
 Domain `Margin` (governed tag `telco_project = margin_analysis`) with groupings: Finance (ledger, gl_actuals, allocation_rules, margin_ledger_mv, dashboard), Ops (circuits, vendors, carrier_invoices, grooming views), Sales (contracts, customers, renewal views), Marketing (customers/segments views). Shared: Margin Genie, the app.
+
+## 8. Certification policy (v1.2, 2026-11-13, COO-Q-20261113-75)
+
+* UC tag `system.certification_status = certified` goes ONLY on answer-serving objects whose numbers were checked against independent raw SQL: the 5 deployed `margin_` metric views in `cdm_tmforum._metrics` plus `revenue_assurance.margin_ledger_allocated` (the canonical CM source, DEC-020). Raw `SUM(revenue_usd - network_expense_usd - cost_to_serve_usd)` = MEASURE(contribution_margin) = 2,375,095,705.09 on 517,032 rows (diff 0.00).
+* Not certified, by design: synthetic inputs (customers, products, vendors, contracts, circuits, billing, carrier_invoices, gl_actuals, allocation_rules, sales_territory), pipeline layers (bronze_invoice_docs, silver_invoice_parsed, margin_ledger_v2), the fast-path baseline `margin_ledger` (+0.26 gap, check-only), and the DQ view `margin_dq_gl_tieout`. Genie and people should answer from the certified MVs, not from these objects.
+* Glossary pages have no certification field in the API, only state DRAFT/PUBLISHED. Knowledge search therefore shows `Certified: no` until a human certifies in the UI (gate DP-ESC-GLOSSARY-CERTIFY, DEC-018 default: uncertified PUBLISHED).
