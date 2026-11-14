@@ -73,6 +73,8 @@ Checksum SQL:
 
 Note for the talk track: this change does not conserve the pool. The customer_care weights sum to 1.20 after the change, so allocated care cost rises by 20% of the 71,910,000.00 customer_care pool (14,382,000.00 plus 2.70 of per-row rounding). Present it as "Finance raises the care-cost weight", not as moving the same cost between drivers. A pool-conserving variant (ticket 0.90 and circuit 0.10) moves CM by only -26.06, which is too small to show on stage.
 
+Presenter guard (DSN-SCENE3-MV-PREVIEW-GUARD, DEC-030/DEC-040): in Catalog Explorer, open `margin_ledger_mv` on the Overview / definition (YAML source and measure list) only. Do NOT open the Sample Data preview: the MV default format shows CM as a compact 0 dp value, which differs from DEC-030. Quote the exact CM to the cent only from Margin Genie or the dashboard.
+
 ## (c) MV depth - pending deployment
 Counts of comment, display_name, format and synonyms must be read from the DEPLOYED view, not from the YAML. Status 2026-11-12: 0 margin_ objects in cdm_tmforum._metrics. Suite MVs (offnet_spend, renewal_floor, segment_growth): not deployed. They are blocked on P2-MV-MARGIN-LEDGER, which waits on P1-LEDGER-GOLD-FASTPATH.
 

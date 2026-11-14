@@ -52,3 +52,4 @@ The guards run in this order inside draft_savings_ticket: score re-check, then p
 
 ## Presenter note
 Scene 6 still opens trace tr-2b088edfed85d22b2db662a6c0a7c68e, the trace for the ticket that is approved live (DEC-037a). The stage dry-run trace is optional extra evidence.
+Scene 6 guardrail talk-track (ML-S6-GATEWAY-GUARDRAIL-EVIDENCE-R34): "The agent only calls the approved Unity Gateway model cdm_tmforum.revenue_assurance.margin_grooming_agent_llm (Claude Sonnet 4.5), and guardrails are on: sensitive data, jailbreak and unsafe content." Backstage proof only, do not show live: request 9b07ddc1-7b6f-4fe9-8682-8ab6f016d4a5 (2026-11-14 09:22:32 UTC) was blocked by block-sensitive-data before the model call.
