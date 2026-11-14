@@ -111,17 +111,17 @@ Talk-track lines that change under defaults: S1 l.83 (no Genie One), S3 l.85 (si
 
 ## Scene fallback index -> resources/REHEARSAL_FALLBACKS.md (COO-Q-20261114-81, @pm run #44, 2026-11-14 ~20:10 UTC)
 
-One shared fallback file (file id 1836563096140356, one asset_ledger row). Line numbers are as of 20:05 UTC.
+One shared fallback file (file id 1836563096140356, one asset_ledger row). Line numbers re-verified by heading scan at ~21:05 UTC Nov 14 (file = 288 lines; @pm run #45, COO-Q-20261114-87). Real image/clip today: none for any scene (text stills only); S1-S6 recorded walkthrough = CEO at Nov 17 rehearsal (DEC-025).
 
 | Scene | Fallback type | Location | Owner | Status | Deadline |
 | --- | --- | --- | --- | --- | --- |
-| S1 | Still: Margin Genie Finance benchmark answer table + SQL | REHEARSAL_FALLBACKS.md section S1/S4 (not yet written) | @data-analyst (PM-FB-S1S4-GENIE-ANSWERS) | OPEN | Nov 15 18:00 UTC |
-| S2 | Still: ledger -> lineage -> PDF path; cash hop is customer-level (DEC-048) | REHEARSAL_FALLBACKS.md l.9-40 | @data-engineer | DONE | - |
-| S3 | Still: rule before/after values + read-only simulation | REHEARSAL_FALLBACKS.md l.41-57 | @data-engineer | DONE | - |
-| S4 | Still: Ops/Sales/Marketing benchmark answer tables | REHEARSAL_FALLBACKS.md section S1/S4 (not yet written) | @data-analyst (PM-FB-S1S4-GENIE-ANSWERS) | OPEN | Nov 15 18:00 UTC |
-| S5 | Recorded clip (CEO, Nov 17) + still spec of the 3-ticket queue and approve target | REHEARSAL_FALLBACKS.md section S5 (not yet written) | @app-developer (PM-FB-S5-QUEUE-STILL) | OPEN | Nov 15 18:00 UTC |
-| S6 | Still: trace span tables, gateway ids, audit SQL | REHEARSAL_FALLBACKS.md l.58-158 | @ml-engineer | DONE | - |
-| S7 | Still: challenge-card copy + expected answers | REHEARSAL_FALLBACKS.md l.159-180 | @designer | DONE | - |
+| S1 | Still: Margin Genie Finance benchmark answer table + SQL | REHEARSAL_FALLBACKS.md section S1/S4 l.199-261 (Finance l.214-222) | @data-analyst (PM-FB-S1S4-GENIE-ANSWERS) | DONE (text still) | - |
+| S2 | Still: ledger -> lineage -> PDF path; cash hop is customer-level (DEC-048) | REHEARSAL_FALLBACKS.md l.9-40 | @data-engineer | DONE (text still) | - |
+| S3 | Still: rule before/after values + read-only simulation | REHEARSAL_FALLBACKS.md l.41-57 | @data-engineer | DONE (text still) | - |
+| S4 | Still: Ops/Sales/Marketing benchmark answer tables | REHEARSAL_FALLBACKS.md section S1/S4 l.199-261 (Ops l.223-234, Sales l.235-246, Marketing l.247-261) | @data-analyst (PM-FB-S1S4-GENIE-ANSWERS) | DONE (text still) | - |
+| S5 | Recorded clip (CEO, Nov 17) + still spec of the 3-ticket queue and approve target | REHEARSAL_FALLBACKS.md section S5 l.262-288 | @app-developer (PM-FB-S5-QUEUE-STILL) | DONE (text still; clip = CEO Nov 17) | Nov 17 (clip) |
+| S6 | Still: trace span tables, gateway ids, audit SQL | REHEARSAL_FALLBACKS.md l.58-173 | @ml-engineer | DONE (text still) | - |
+| S7 | Still: challenge-card copy + expected answers | REHEARSAL_FALLBACKS.md l.174-198 | @designer | DONE (text still) | - |
 
 Recorded walkthrough of S1-S6 = CEO only, at the Nov 17 rehearsal (DEC-025). Verifier: @qa (QA-VERIFY-REHEARSAL-FALLBACKS).
 
