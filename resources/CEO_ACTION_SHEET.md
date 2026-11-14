@@ -11,7 +11,7 @@ Owner: @pm. Created 2026-11-13 06:10 UTC (COO-Q-20261113-25). This file is the C
 | 5 | ~~Genie One capture (PM-GENIE-ONE-CEO-CAPTURE)~~ EXPIRED - default applied (DEC-029b) at Nov 14 18:05 UTC (@pm run #42): no capture in margin_documents/rehearsal/genie_one/. Margin Genie only on stage, no Genie One claim. | S1/S4 | none | - | applied |
 | 6 | ~~Delete TEST ticket~~ CLOSED 2026-11-14 by DEC-038: no CEO action. The row stays, because approval_audit FK audit_id=3 references it. The live SHOW_TEST_TICKETS=false filter hides it, so the Ops queue shows exactly 3 tickets. Do NOT run SQL D. | - | - | - | - |
 | 7 | @devops approval gate (DEVOPS-JOBS-ONLY-FALLBACK) | Leave-behind DAB | Reply "approve DEVOPS-JOBS-ONLY-FALLBACK" when a @devops run asks, or set the task in_progress on the board | 1 min | Nov 16 12:00 CT -> DAB shown as source in git only |
-| 9 | Certify glossary pages (DP-ESC-GLOSSARY-CERTIFY) | S3 trust claim | Discover > Margin domain > Glossary: certify the 15 PUBLISHED Margin pages (ids in agent_notes 1041). Certification is UI-only; the API has no field for it (note 1185) | 5 min | Nov 15 12:00 CT -> say 'published and owned by Finance', not 'certified' |
+| 9 | Certify glossary pages (DP-ESC-GLOSSARY-CERTIFY) | S3 trust claim | Discover > Margin domain > Glossary: certify the 16 PUBLISHED Margin pages (ids in agent_notes 1825; Rate Variance stays DRAFT per DEC-031/DEC-049, do not certify it). Certification is UI-only; the API has no field for it (note 1185) | 5 min | Nov 15 12:00 CT -> say 'published and owned by Finance', not 'certified' |
 | 8 | Delete stale pipeline (DE-DELETE-STALE-PIPELINE) - EXPIRED, default applied (DEC-029a) at Nov 14 18:05 UTC (@pm run #42) | S2 | Optional after Nov 19: in the Pipelines UI, delete ccea7e91-e657-4168-82fe-588f4e6437d5 (IDLE, verified 18:04 UTC). Demo shows only 20960984. | 1 min | applied: IDLE, excluded from demo, retire after demo |
 
 ## SQL A: app SP grants (gate 1)
@@ -108,5 +108,21 @@ Mode is what happens if no human acts before each cutoff. Live = driven on stage
 | S7 | Dashboard 01f1df1950c51bd68e87ace31632c2bf page 2 ($1B Wall) | Live | none | none | @data-analyst | republished Nov 14 16:18:15 |
 
 Talk-track lines that change under defaults: S1 l.83 (no Genie One), S3 l.85 (simulation, not live change), S5 l.87 (recorded approval), S6 l.88 ('user identity', Sales SQL simulation). S2 l.84 and S7 l.89 unchanged.
+
+## Scene fallback index -> resources/REHEARSAL_FALLBACKS.md (COO-Q-20261114-81, @pm run #44, 2026-11-14 ~20:10 UTC)
+
+One shared fallback file (file id 1836563096140356, one asset_ledger row). Line numbers are as of 20:05 UTC.
+
+| Scene | Fallback type | Location | Owner | Status | Deadline |
+| --- | --- | --- | --- | --- | --- |
+| S1 | Still: Margin Genie Finance benchmark answer table + SQL | REHEARSAL_FALLBACKS.md section S1/S4 (not yet written) | @data-analyst (PM-FB-S1S4-GENIE-ANSWERS) | OPEN | Nov 15 18:00 UTC |
+| S2 | Still: ledger -> lineage -> PDF path; cash hop is customer-level (DEC-048) | REHEARSAL_FALLBACKS.md l.9-40 | @data-engineer | DONE | - |
+| S3 | Still: rule before/after values + read-only simulation | REHEARSAL_FALLBACKS.md l.41-57 | @data-engineer | DONE | - |
+| S4 | Still: Ops/Sales/Marketing benchmark answer tables | REHEARSAL_FALLBACKS.md section S1/S4 (not yet written) | @data-analyst (PM-FB-S1S4-GENIE-ANSWERS) | OPEN | Nov 15 18:00 UTC |
+| S5 | Recorded clip (CEO, Nov 17) + still spec of the 3-ticket queue and approve target | REHEARSAL_FALLBACKS.md section S5 (not yet written) | @app-developer (PM-FB-S5-QUEUE-STILL) | OPEN | Nov 15 18:00 UTC |
+| S6 | Still: trace span tables, gateway ids, audit SQL | REHEARSAL_FALLBACKS.md l.58-158 | @ml-engineer | DONE | - |
+| S7 | Still: challenge-card copy + expected answers | REHEARSAL_FALLBACKS.md l.159-180 | @designer | DONE | - |
+
+Recorded walkthrough of S1-S6 = CEO only, at the Nov 17 rehearsal (DEC-025). Verifier: @qa (QA-VERIFY-REHEARSAL-FALLBACKS).
 
 Delivery: no path has reached the CEO yet. margin_ceo_slack is not created (checked 02:05 UTC 11-14), and the Slack MCP connector has read/search tools only. This sheet and status_updates (ceo_escalation) are the only channels.
