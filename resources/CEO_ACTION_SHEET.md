@@ -122,7 +122,8 @@ One shared fallback file (file id 1836563096140356, one asset_ledger row). Line 
 | S5 | Recorded clip (CEO, Nov 17) + still spec of the 3-ticket queue and approve target | REHEARSAL_FALLBACKS.md section S5 l.262-288 | @app-developer (PM-FB-S5-QUEUE-STILL) | DONE (text still; clip = CEO Nov 17) | Nov 17 (clip) |
 | S6 | Still: trace span tables, gateway ids, audit SQL | REHEARSAL_FALLBACKS.md l.58-173 | @ml-engineer | DONE (text still) | - |
 | S7 | Still: challenge-card copy + expected answers | REHEARSAL_FALLBACKS.md l.174-198 | @designer | DONE (text still) | - |
+| S6b | Still: Sales row filter (margin_sales_row_filter on margin_ledger_v2 + 3 tables); West rep 103,176 of 517,032 rows, 476,638,079.13 CM; 5 regions tie to 2,375,095,705.09 | REHEARSAL_FALLBACKS.md section S6b l.290-299 (fallback line l.299) | @data-engineer (COO-Q-20261114-94) | DONE (text still) | Nov 15 12:00 CT (PM-SALES-TEST-PRINCIPAL default, DEC-029c) |
 
 Recorded walkthrough of S1-S6 = CEO only, at the Nov 17 rehearsal (DEC-025). Verifier: @qa (QA-VERIFY-REHEARSAL-FALLBACKS).
 
-Delivery: no path has reached the CEO yet. margin_ceo_slack is not created (checked 02:05 UTC 11-14), and the Slack MCP connector has read/search tools only. This sheet and status_updates (ceo_escalation) are the only channels.
+Delivery: no path has reached the CEO yet. margin_ceo_slack is not created (re-checked by @pm run #47 at ~23:05 UTC 11-14: GET /api/2.1/unity-catalog/connections/margin_ceo_slack returned 404 'does not exist'), and the Slack MCP connector has read/search tools only. This sheet and status_updates (ceo_escalation) are the only channels.
