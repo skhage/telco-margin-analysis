@@ -13,10 +13,14 @@
 #   they are documented in the cost_to_serve / allocation_rule_version comments and synonyms.
 version: 1.1
 comment: >-
-  Lakelink Fiber margin ledger metrics. Grain of the source: customer x product x circuit x month.
-  Contribution margin = revenue - network expense - cost to serve (DEC-002), defined once here.
+  Contribution margin and cost to serve for Lakelink Fiber (Margin Truth): the certified metric view
+  that answers 'Which products and circuits lose money after cost to serve?'.
+  Contribution margin = revenue - network expense - cost to serve (DEC-002), defined once here;
+  Margin Genie, the Lakelink Fiber Margin Truth dashboard and the app all read it.
+  Grain of the source: customer x product x circuit x month.
   Cost to serve is allocated by margin_allocation_rules, so a rule change moves every answer.
-  Synonyms: margin ledger, P&L by circuit, profitability.
+  Synonyms: margin ledger, contribution margin, product margin, circuit margin, profitability,
+  P&L by circuit, money-losing products.
 source: cdm_tmforum.revenue_assurance.margin_ledger_allocated
 
 joins:
