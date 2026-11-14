@@ -321,6 +321,17 @@ def margin_metric_view_reference():
     return out
 
 
+# SAME-NUMBER FOOTER (COO-Q-20261114-54, 2026-11-14): the user-visible final response always ends with the canonical CM
+# copied verbatim (no LLM rewrite) from the margin_metric_view_reference span = MEASURE(contribution_margin) on
+# margin_ledger_mv (DEC-002/020). Display per DEC-030/033: USD, 2 dp, thousands separators -> USD 2,375,095,705.09.
+def cm_footer(ref):
+    v = ref.get("portfolio_contribution_margin_usd")
+    if v is None:
+        return ""
+    return (f"\n\nPortfolio contribution margin (Lakelink Fiber, MEASURE(contribution_margin) from "
+            f"{ref.get('metric_view_cm')}, statement {ref.get('cm_statement_id')}): USD {float(v):,.2f}")
+
+
 @mlflow.trace(name="lakelink_offnet_grooming_agent", span_type=SpanType.AGENT)
 def run_agent(task, max_turns=8):
     mlflow.update_current_trace(tags={"telco_project": "margin_analysis", "company": "Lakelink Fiber",
@@ -339,7 +350,9 @@ def run_agent(task, max_turns=8):
         messages.append({k: v for k, v in msg.items() if k in ("role", "content", "tool_calls")})
         tcs = msg.get("tool_calls") or []
         if not tcs:
-            return {"final": msg.get("content"), "tool_calls": calls}
+            return {"final": (msg.get("content") or "") + cm_footer(ref), "tool_calls": calls,
+                    "portfolio_contribution_margin_usd": ref.get("portfolio_contribution_margin_usd"),
+                    "cm_statement_id": ref.get("cm_statement_id")}
         for tc in tcs:
             fn = tc["function"]["name"]
             res = DISPATCH[fn](**json.loads(tc["function"]["arguments"] or "{}"))
