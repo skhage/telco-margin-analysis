@@ -88,6 +88,8 @@ Owner: @pm. This sheet becomes the plan of record gate by gate at each cutoff be
 | S6 | GO-FALLBACK | Gate 3 expires Nov 15 12:00 CT -> user-identity trace tr-2b088edf (ML-GROOMING-FALLBACK-PATH) | "Every step is traced under a governed identity, and guardrails are on." Say 'user identity', not 'service principal'. Sales: "margin_sales_row_filter: West rep simulation shows 103,176 of 517,032 rows." |
 | S7 | GO | none | "Find your biggest lever on the $1B Wall." |
 
+Same-number stage rule (DEC-040, @pm run #30, 2026-11-14 ~05:10 UTC): the exact CM 2,375,095,705.09 is claimed on stage only on Margin Genie and on the dashboard with Quarter=All. The app explorer CM column is not used for the same-number claim while build 01f1df66 (0 dp) is live, and there is no Genie One claim unless gate 5 clears by Nov 14 18:00 UTC. Lifted per surface only if @qa verifies the fix before the Nov 16 00:00 UTC freeze.
+
 Nov 17 rehearsal check (human, @data-planner COO-Q-20261114-17):
 - [ ] Discover > Lakelink Fiber Margin (domain 2abc9194) > Finance shows exactly 12 assets: 9 UC objects (margin_allocation_rules, margin_dq_gl_tieout, margin_gl_actuals, margin_ledger, margin_ledger_allocated, margin_ledger_v2, margin_products, _metrics.margin_ledger_mv, _metrics.margin_onebillion_wall_mv) + dashboard Lakelink Fiber Margin Truth (01f1df1950c51bd68e87ace31632c2bf) + Margin Genie (01f1df115a08164aab3ae5f6faac807c) + app lakelink-margin-truth. Pipeline ccea7e91 must NOT appear. If the count differs, note it here and tell @data-planner.
 

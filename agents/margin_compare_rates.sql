@@ -2,7 +2,8 @@
 -- Deployed to cdm_tmforum.revenue_assurance. Tag telco_project=margin_analysis rejected by governed tag policy; recorded in COMMENT.
 -- Known answers (2026-11-13): NULL -> 17,427 rows, 209,124 lines, 4,504 overbilled lines, rate_variance 1,694,614.90, paid 959,602,431.58;
 --   circuit 45040 -> 12 months, 6 overbilled, variance 1,280.04; vendor 00100000000265pAAA -> 621 circuits, 597,884.80.
-CREATE OR REPLACE FUNCTION cdm_tmforum.revenue_assurance.margin_compare_rates(p_vendor_id STRING)
+-- 2026-11-14 ML-FN-PARAM-COMMENTS: param COMMENT added, body and return-column comments unchanged (NULL -> 17,427 rows / variance 1,694,614.90 before and after).
+CREATE OR REPLACE FUNCTION cdm_tmforum.revenue_assurance.margin_compare_rates(p_vendor_id STRING COMMENT 'Lakelink Fiber carrier vendor_id to audit (margin_vendors.vendor_id, Salesforce partner_account Id). NULL audits all vendors.')
 RETURNS TABLE (
   vendor_id STRING COMMENT 'Third-party carrier (Salesforce partner_account Id).',
   vendor_name STRING COMMENT 'Fictional carrier name.',

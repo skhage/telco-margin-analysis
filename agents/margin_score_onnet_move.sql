@@ -8,7 +8,8 @@
 --   (USD 2.00 per Mbps per month + USD 0.50 per metre to nearest Lakelink fiber, amortised over 36 months).
 -- Not contribution margin: CM stays in cdm_tmforum._metrics.margin_ledger_mv (DEC-002).
 
-CREATE OR REPLACE FUNCTION cdm_tmforum.revenue_assurance.margin_score_onnet_move(p_circuit_id BIGINT)
+-- 2026-11-14 ML-FN-PARAM-COMMENTS: param COMMENT added, body unchanged (regression 47 / 34,378.33 per month = 412,539.96 per year before and after).
+CREATE OR REPLACE FUNCTION cdm_tmforum.revenue_assurance.margin_score_onnet_move(p_circuit_id BIGINT COMMENT 'Lakelink Fiber off-net circuit_id to score (margin_circuits.circuit_id). NULL scores all off-net circuits.')
 RETURNS TABLE (
   circuit_id BIGINT,
   vendor_id STRING,

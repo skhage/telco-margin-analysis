@@ -21,7 +21,7 @@
               "dataType": "STRING",
               "values": [
                 {
-                  "value": "2026-07-01"
+                  "value": "All"
                 }
               ]
             }
@@ -96,7 +96,7 @@
               "dataType": "STRING",
               "values": [
                 {
-                  "value": "2026-07-01"
+                  "value": "All"
                 }
               ]
             }
@@ -172,7 +172,7 @@
               "dataType": "STRING",
               "values": [
                 {
-                  "value": "2026-07-01"
+                  "value": "All"
                 }
               ]
             }
@@ -247,7 +247,7 @@
               "dataType": "STRING",
               "values": [
                 {
-                  "value": "2026-07-01"
+                  "value": "All"
                 }
               ]
             }
@@ -323,7 +323,7 @@
               "dataType": "STRING",
               "values": [
                 {
-                  "value": "2026-07-01"
+                  "value": "All"
                 }
               ]
             }
@@ -398,7 +398,7 @@
               "dataType": "STRING",
               "values": [
                 {
-                  "value": "2026-07-01"
+                  "value": "All"
                 }
               ]
             }
