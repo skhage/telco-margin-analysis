@@ -8,11 +8,11 @@ Owner: @pm. Created 2026-11-13 06:10 UTC (COO-Q-20261113-25). This file is the C
 | 2 | App redeploy (after gate 1) | S5 | Reply "approve redeploy" in an @app-developer run, or in the Apps UI click Deploy on lakelink-margin-truth (source apps/margin-truth) | 2 min | Nov 16 12:00 CT -> dashboard explorer page |
 | 3 | Agent SP (P4-GATEWAY-SP-TRACING) | S6 identity | Command B below (create SP lakelink-margin-grooming-agent + grants) | 4 min | Nov 15 12:00 CT -> user-identity trace (ML-GROOMING-FALLBACK-PATH) |
 | 4 | ~~Discover domain quota (DP-ESC-DOMAIN-QUOTA)~~ DONE 2026-11-13: domain 2abc9194-aed9-4088-bfa6-4b4d33870ebd verified by GET (@pm run #9). No CEO action. | - | - | - | - |
-| 5 | Genie One capture (PM-GENIE-ONE-CEO-CAPTURE) | S1/S4 Genie One claim | Steps C below (2 questions, 2 screenshots) | 3 min | Nov 14 18:00 UTC -> Margin Genie only on stage, no Genie One claim |
+| 5 | ~~Genie One capture (PM-GENIE-ONE-CEO-CAPTURE)~~ EXPIRED - default applied (DEC-029b) at Nov 14 18:05 UTC (@pm run #42): no capture in margin_documents/rehearsal/genie_one/. Margin Genie only on stage, no Genie One claim. | S1/S4 | none | - | applied |
 | 6 | ~~Delete TEST ticket~~ CLOSED 2026-11-14 by DEC-038: no CEO action. The row stays, because approval_audit FK audit_id=3 references it. The live SHOW_TEST_TICKETS=false filter hides it, so the Ops queue shows exactly 3 tickets. Do NOT run SQL D. | - | - | - | - |
 | 7 | @devops approval gate (DEVOPS-JOBS-ONLY-FALLBACK) | Leave-behind DAB | Reply "approve DEVOPS-JOBS-ONLY-FALLBACK" when a @devops run asks, or set the task in_progress on the board | 1 min | Nov 16 12:00 CT -> DAB shown as source in git only |
 | 9 | Certify glossary pages (DP-ESC-GLOSSARY-CERTIFY) | S3 trust claim | Discover > Margin domain > Glossary: certify the 15 PUBLISHED Margin pages (ids in agent_notes 1041). Certification is UI-only; the API has no field for it (note 1185) | 5 min | Nov 15 12:00 CT -> say 'published and owned by Finance', not 'certified' |
-| 8 | Delete stale pipeline (DE-DELETE-STALE-PIPELINE) | ONE-pipeline rule, S2 lineage clarity | In the Pipelines UI, delete pipeline ccea7e91-e657-4168-82fe-588f4e6437d5 (IDLE, owns 0 UC datasets; live pipeline is 20960984). Agent deletes are blocked by the safety guardrail. | 1 min | Nov 14 18:00 UTC -> ccea7e91 stays IDLE, excluded from demo, retire after demo (PM-STALE-PIPELINE-FALLBACK) |
+| 8 | Delete stale pipeline (DE-DELETE-STALE-PIPELINE) - EXPIRED, default applied (DEC-029a) at Nov 14 18:05 UTC (@pm run #42) | S2 | Optional after Nov 19: in the Pipelines UI, delete ccea7e91-e657-4168-82fe-588f4e6437d5 (IDLE, verified 18:04 UTC). Demo shows only 20960984. | 1 min | applied: IDLE, excluded from demo, retire after demo |
 
 ## SQL A: app SP grants (gate 1)
 ```sql
@@ -32,7 +32,7 @@ GRANT USE SCHEMA, SELECT ON SCHEMA cdm_tmforum._metrics TO `lakelink-margin-groo
 ```
 (Use the SP application id instead of the display name if the name is rejected.)
 
-## Steps C: Genie One capture (gate 5)
+## Steps C: Genie One capture (gate 5) - EXPIRED, default applied (DEC-029b); optional only, no stage claim
 1. Open Genie One (workspace chat, not the Margin Genie space).
 2. Ask: "Which product families lost money after cost to serve last quarter?" Expected: IP-VPN -6,715,475.88 and Legacy Voice -249,532.74.
 3. Ask: "What is total contribution margin by product family?" Expected total 2,375,095,705.09.
@@ -56,7 +56,7 @@ The Genie Code Auto Mode guardrail blocks these in scheduled runs, so the CEO ha
 | I5 | App SP grants + redeploy (gates 1-2) | SQL A below, then Deploy lakelink-margin-truth | SP privileges false -> true; new active_deployment id | REVOKE the same grants | 5 | @app-developer |
 | I6 | Agent SP (gate 3) | Command B below | trace identity user -> SP | remove SP | 4 | @ml-engineer |
 | I7 | Leave-behind jobs (P6-DAB-DEPLOY) | Web terminal, from bundle/: `databricks bundle deploy -t jobs_only` | 0 -> 4 lakelink-margin-* jobs | `databricks bundle destroy -t jobs_only` | 3 | @devops |
-| I8 | Genie One capture (gate 5) | Steps C below | 2 screenshots | n/a | 3 | @qa |
+| I8 | Genie One capture (gate 5) - EXPIRED, default applied (DEC-029b) | none | - | n/a | 0 | @qa |
 
 If I1 has not run by Nov 15 12:00 CT, scene 3 is DESCOPED to definition plus simulation (DEC-027(3)). Other cutoffs follow DEC-018.
 
@@ -66,7 +66,7 @@ Update 2026-11-13 @pm run #9: gate 4 closed; P2-GLOSSARY-PAGES and P2-DISCOVER-D
 
 | Scene | Status | Artifact / last verified | Open gate | Fallback trigger |
 | --- | --- | --- | --- | --- |
-| S1 Question (Genie, CFO) | GO (Margin Genie); Genie One AT RISK | Genie 01f1df115a08164aab3ae5f6faac807c, Finance starter exact to the cent (@qa 05:42 UTC) | Gate 5 | Nov 14 18:00 UTC |
+| S1 Question (Genie, CFO) | GO (Margin Genie only; Genie One not claimed, DEC-029b) | Genie 01f1df115a08164aab3ae5f6faac807c, Finance starter exact to the cent (@qa 05:42 UTC) | none (gate 5 expired) | applied Nov 14 18:05 UTC |
 | S2 Answer -> ledger -> lineage -> PDF | GO | margin_ledger_allocated repointed to margin_ledger_v2, MV = 2,375,095,705.09 | none (lineage audit P5-LINEAGE-AUDIT open @qa) | fast path stays canonical if v2 drifts |
 | S3 Metric view + allocation rule simulation | GO-FALLBACK (read-only sim, DEC-027(3)); live UPDATE only if I1 runs by Nov 15 12:00 CT | read-only sim: care ticket weight 0.70->0.90 gives 2,360,713,702.39 (@data-analyst COO-Q-20261114-14, stmt 01f1dfda-1045-19e0-b62c-de220bc21390) | I1 (CEO, optional) | Nov 15 12:00 CT -> definition + read-only simulation (no recorded clip) |
 | S4 One Genie Ops/Sales/Marketing | GO on accuracy, display FIX open (run #12) | 9 Genie sources, 13/13 benchmark SQLs correct; pct/USD/boolean display fails (DSN-GENIE-FORMAT-R2); Ops label DEC-026 (DA-OPS-SAVINGS-LABEL-FIX) | none (agent work) | Nov 15 12:00 CT -> answer from margin_ledger_mv + dims |
@@ -92,5 +92,21 @@ Same-number stage rule (DEC-040, @pm run #30, 2026-11-14 ~05:10 UTC): the exact 
 
 Nov 17 rehearsal check (human, @data-planner COO-Q-20261114-17):
 - [ ] Discover > Lakelink Fiber Margin (domain 2abc9194) > Finance shows exactly 12 assets: 9 UC objects (margin_allocation_rules, margin_dq_gl_tieout, margin_gl_actuals, margin_ledger, margin_ledger_allocated, margin_ledger_v2, margin_products, _metrics.margin_ledger_mv, _metrics.margin_onebillion_wall_mv) + dashboard Lakelink Fiber Margin Truth (01f1df1950c51bd68e87ace31632c2bf) + Margin Genie (01f1df115a08164aab3ae5f6faac807c) + app lakelink-margin-truth. Pipeline ccea7e91 must NOT appear. If the count differs, note it here and tell @data-planner.
+
+## Stage-mode matrix, scenes 1-7 (COO-Q-20261114-72, @pm run #42, 2026-11-14 ~18:05 UTC)
+
+Mode is what happens if no human acts before each cutoff. Live = driven on stage from the workspace. Recorded = a clip the CEO records at the Nov 17 rehearsal (DEC-025; agents cannot screen-record). Still = a static image or SQL result. No fallback screenshot or recording exists in resources/ or the margin_documents volume as of this run.
+
+| Scene | Surface + asset id | Mode (no human action) | Gate / DEC | Fallback artifact | Owner | Last verified (UTC) |
+| --- | --- | --- | --- | --- | --- | --- |
+| S1 | Margin Genie 01f1df115a08164aab3ae5f6faac807c | Live | G5 expired -> DEC-029b (no Genie One claim) | Eval 01f1e02d 13/13, Finance stmt 01f1e02d-ebc6-142b-9dc5-dd0d9f4d08da (no screenshot; PM-GENIE-BENCH-SCREENSHOTS open) | @data-analyst | Nov 14 17:44 (@qa status 594) |
+| S2 | margin_ledger_allocated -> lineage -> PDF; pipeline 20960984 only | Live | G8 expired -> DEC-029a (ccea7e91 IDLE, excluded) | none needed (read-only UC pages) | @data-engineer | Nov 14 18:04 (@pm pipelines.get) |
+| S3 | _metrics.margin_ledger_mv + read-only simulation | Live (definition + simulation) | I1 cutoff Nov 15 18:00 UTC -> DEC-027(3) | stmt 01f1dfda-1045-19e0-b62c-de220bc21390 (2,360,713,702.39) | @data-analyst | Nov 14 17:48 (COO MV = raw) |
+| S4 | Margin Genie 01f1df115a08164aab3ae5f6faac807c | Live | none | eval 01f1e02d 13/13 | @data-analyst | Nov 14 17:44 |
+| S5 | App lakelink-margin-truth, deployment 01f1df66 | Recorded (approval click) | G1 cutoff Nov 15 18:00 UTC -> DEC-025 | Clip does not exist yet: CEO records at Nov 17 rehearsal. If nobody records, scene 5 becomes a still of the 3-ticket queue taken at rehearsal | @app-developer | Nov 14 17:28 (app RUNNING, pending None) |
+| S6 | MLflow trace tr-2b088edf (experiment 1235449331932066) + audit rows | Live (user identity) | G3 cutoff Nov 15 18:00 UTC -> ML-GROOMING-FALLBACK-PATH | gateway request_ids in agent_notes 1774 | @ml-engineer | Nov 14 17:23 (ML R42) |
+| S7 | Dashboard 01f1df1950c51bd68e87ace31632c2bf page 2 ($1B Wall) | Live | none | none | @data-analyst | republished Nov 14 16:18:15 |
+
+Talk-track lines that change under defaults: S1 l.83 (no Genie One), S3 l.85 (simulation, not live change), S5 l.87 (recorded approval), S6 l.88 ('user identity', Sales SQL simulation). S2 l.84 and S7 l.89 unchanged.
 
 Delivery: no path has reached the CEO yet. margin_ceo_slack is not created (checked 02:05 UTC 11-14), and the Slack MCP connector has read/search tools only. This sheet and status_updates (ceo_escalation) are the only channels.
