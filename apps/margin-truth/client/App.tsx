@@ -130,7 +130,7 @@ function ApprovalQueue() {
         <div className="llf-card llf-table-wrap">
           <table>
             <caption className="llf-state" style={{ textAlign: "left", padding: 0 }}>{plural(tickets.length, "ticket", "tickets")}</caption>
-            <thead><tr><th>Ticket</th><th>Circuit</th><th>Vendor</th><th className="num">Monthly cost</th><th className="num">Est. monthly savings</th><th>Agent</th><th>Status</th><th>Action</th></tr></thead>
+            <thead><tr><th scope="col">Ticket</th><th scope="col">Circuit</th><th scope="col">Vendor</th><th scope="col" className="num">Monthly cost</th><th scope="col" className="num">Est. monthly savings</th><th scope="col">Agent</th><th scope="col">Status</th><th scope="col">Action</th></tr></thead>
             <tbody>
               {tickets.map((t) => (
                 <tr key={t.ticket_id}>
@@ -178,7 +178,7 @@ function ApprovalQueue() {
             <dt>MLflow experiment</dt><dd>{orNA(evidence.experimentId)}</dd>
             <dt>Decision</dt><dd><StatusBadge status={evidence.ticket.status} />{evidence.ticket.decided_by ? ` by ${evidence.ticket.decided_by}` : ""}{evidence.ticket.decided_at ? ` on ${fmtWhen(evidence.ticket.decided_at)}` : ""}</dd>
           </dl>
-          <div className="llf-table-wrap"><table><caption className="llf-caption">Audit record ({plural(evidence.audit.length, "entry", "entries")})</caption><thead><tr><th>When</th><th>Action</th><th>Actor</th><th>Role</th><th>Details</th></tr></thead>
+          <div className="llf-table-wrap"><table><caption className="llf-caption">Audit record ({plural(evidence.audit.length, "entry", "entries")})</caption><thead><tr><th scope="col">When</th><th scope="col">Action</th><th scope="col">Actor</th><th scope="col">Role</th><th scope="col">Details</th></tr></thead>
             <tbody>{evidence.audit.map((a, i) => <tr key={i}><td>{fmtWhen(a.at)}</td><td>{sentence(a.action)}</td><td>{a.actor}</td><td>{orNA(a.actor_role)}</td><td>{auditDetail(a.details)}</td></tr>)}</tbody>
           </table></div>
         </section>
@@ -225,7 +225,7 @@ function MarginExplorer({ metricView, genieSpaceId }: { metricView: string; geni
       {rows && rows.length > 0 && (
         <div className="llf-card llf-table-wrap"><table>
           <caption className="llf-caption">Margin by {DIMENSIONS.find(([k]) => k === dim)?.[1]}</caption>
-          <thead><tr><th>{DIMENSIONS.find(([k]) => k === dim)?.[1]}</th><th className="num">Revenue</th><th className="num">Network Expense</th><th className="num">Cost to Serve</th><th className="num">Contribution Margin</th><th className="num">CM %</th><th className="num">Circuits</th></tr></thead>
+          <thead><tr><th scope="col">{DIMENSIONS.find(([k]) => k === dim)?.[1]}</th><th scope="col" className="num">Revenue</th><th scope="col" className="num">Network Expense</th><th scope="col" className="num">Cost to Serve</th><th scope="col" className="num">Contribution Margin</th><th scope="col" className="num">CM %</th><th scope="col" className="num">Circuits</th></tr></thead>
           <tbody>{rows.map((r, i) => (
             <tr key={i}>
               <td>{orNA(r.dimension)}</td><td className="num">{fmtUsd(r.revenue)}</td><td className="num">{fmtUsd(r.network_expense)}</td>
