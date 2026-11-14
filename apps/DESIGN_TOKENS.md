@@ -1,4 +1,4 @@
-# Lakelink Fiber Design Tokens v1.2 (Margin Truth)
+# Lakelink Fiber Design Tokens v1.3 (Margin Truth)
 
 Owner: @designer. Task: P3-DESIGN-SYSTEM (2026-11-12). These rules are binding. They cover the ONE app (`apps/margin-truth`), the ONE AI/BI dashboard, and the Margin Genie experience.
 Company name in every UI string: **Lakelink Fiber**. Product name: **Margin Truth**. Never use a real company name.
@@ -44,7 +44,7 @@ Series 2 and 5 are both warm hues, so charts with 4 or more series must use dire
 
 * Family: `Inter, system-ui, -apple-system, "Segoe UI", sans-serif`. Inter is not bundled yet, so the system fallback is acceptable for the demo.
 * Scale (px): 12 caption (non-essential only), 13 table header, 14 table body, 16 body, 20 H2/app title, 24 H1/KPI label, 32 KPI value.
-* Numbers: `font-variant-numeric: tabular-nums`, right-aligned. Currency is USD with no decimals in tables and compact ($1.2M) in KPI tiles. Percentages have 1 decimal.
+* Numbers: `font-variant-numeric: tabular-nums`, right-aligned. Currency is USD with 2 decimals (e.g. $2,375,095,705.09) in tables, detail rows, and agent tickets. KPI tiles may use compact format ($2.38B) if the exact 2dp value is visible on the same page or tooltip. Counts stay 0dp; percentages 1dp.
 * Weights: 400 body, 600 headings, labels, and active tab.
 
 ## 4. Spacing, shape, icons
@@ -92,11 +92,12 @@ Series 2 and 5 are both warm hues, so charts with 4 or more series must use dire
 * Sample questions: the four persona starters from the plan, with any carrier name in the plan wording replaced by "our own fiber" or "the Lakelink Fiber network".
 * Approved description (paste into the space): "Ask Lakelink Fiber margin questions in plain English. One space for Finance, Ops, Sales, and Marketing. Margin always means contribution margin (revenue minus network expense minus cost to serve) from the governed metric view margin_ledger_mv, so every team gets the same number."
 * Approved sample questions, in this order: (1) Finance: "Which product families lost money after cost to serve last quarter?" (2) Ops: "Which off-net circuits run next to our own fiber, and what do we pay for them?" (3) Sales: "Which renewals in the next 90 days are below the margin floor?" (4) Marketing: "Which segments have the highest margin and the most room to grow?"
-* Answers show money in USD with no decimals and percentages with 1 decimal, matching the metric view formats.
+* Answers show money in USD with 2 decimals and percentages with 1 decimal, matching the metric view formats and DEC-030.
 * Copy reviewed under DA-GENIE-COPY-REVIEW (2026-11-12, PASS with changes); remediation in DSN-GENIE-COPY-R1.
 
 ## Change log
 
+* v1.3 2026-11-14 @designer: section 3 currency format updated from 0dp to 2dp per DEC-030; section 9 Genie answer format aligned to 2dp; compact KPI rule clarified.
 * v1.2 2026-11-12 @designer: section 8 dashboard title aligned to "Lakelink Fiber Margin Truth" (bundle yml) and page 2 renamed "$1B Wall tracker"; adds the red/green 1.20:1 rule and a link to resources/dashboard_layout_spec.md.
 * v1.1 2026-11-12 @designer: section 7 adds the Contribution Margin % naming rule and the title-case category value rule; section 9 adds the approved Genie description and the ordered sample questions (DA-GENIE-COPY-REVIEW).
 * v1.0 2026-11-12 @designer: first release. Supersedes the provisional values in `apps/margin-truth/client/tokens.css`. Changes: focus ring moved from accent to #1B3139, border-strong added, viz-5 changed from #FF8C69 to #D9603B, viz-4 changed from #6E8898 to #5F7A8A, viz order now leads with #1B3139.

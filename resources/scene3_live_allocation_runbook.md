@@ -35,7 +35,7 @@ The allocation SQL ran on the real `margin_circuits` table (43,086 circuits, all
 * Query time: 1.22 s and 1.17 s on serverless.
 * The pool is conserved: totals are 1,000,000.00 and 1,000,000.01 (rounding).
 * An independent pandas recomputation matched every family to the cent.
-* Takeaway: shifting weight from bandwidth to circuit count moves cost away from Wavelength and onto per-circuit families. Use this to tune the demo rule.
+* Takeaway: raising the circuit_count weight increases allocated cost for per-circuit families and reduces it for bandwidth-heavy families (Wavelength). Use this to tune the demo rule.
 
 ## (b) Live-demo runbook (fill in once the tables exist)
 
