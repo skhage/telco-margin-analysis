@@ -304,7 +304,7 @@
       "name": "ds_cfo_circuits",
       "displayName": "Top 25 loss-making circuits (margin_ledger_mv)",
       "queryLines": [
-        "SELECT circuit_id, customer_id, product_family, INITCAP(family_class) AS family_class, network_type, vendor_id,\n",
+        "SELECT CAST(circuit_id AS STRING) AS circuit_id, CAST(customer_id AS STRING) AS customer_id, product_family, INITCAP(family_class) AS family_class, network_type, vendor_id,\n",
         "  MEASURE(contribution_margin) AS contribution_margin, MEASURE(cm_pct) AS cm_pct, MEASURE(revenue) AS revenue, MEASURE(network_expense) AS network_expense, MEASURE(cost_to_serve) AS cost_to_serve\n",
         "FROM cdm_tmforum._metrics.margin_ledger_mv\n",
         "WHERE (:quarter = 'All' OR CAST(ledger_quarter AS DATE) = try_cast(:quarter AS DATE))\n",
