@@ -43,5 +43,12 @@ The guards run in this order inside draft_savings_ticket: score re-check, then p
 * 35360: `dry_run: true`, would_insert GROOM-<new>, cost 2513.61, savings 2307.07, score 95, score_basis carrier_invoice
 * After the check, approval_tickets still has 4 rows, 0 for circuit 35360. Nothing was inserted.
 
+## Full-path stage dry run (COO-Q-20261114-15, 2026-11-14)
+* tr-0d79c0ba (4.98 s) is a guard-check harness only (3 x draft/score, no Genie, no LLM). Do not quote it as the agent latency.
+* Full agent dry run with the stage config: trace tr-f9425413a18437e7211d0c723588d0f1 (experiment 1235449331932066), 73.5 s, tags dry_run=true, genie_mode=margin_genie, identity_mode=user_fallback. Spans: metric view reference 9.5 s, Margin Genie 22.4 s, 4 gateway_chat calls 39.3 s, score 0.9 s, draft 1.1 s. draft_savings_ticket returned would_insert GROOM-f14ea57020, circuit 35360, cost 2,513.61, savings 2,307.07, score 95.
+* For comparison, live hero trace tr-2b088edf took 51.7 s. A stage run takes 50-75 s, well over 30 s.
+* Pre-rolled fallback: open tr-f9425413 in the Traces tab and do not wait for a live run. After the run the queue still had 4 rows, 0 for 35360, and 3 pending non-TEST tickets.
+* The agent's line that 35360 has the highest estimated savings is true. Checked 2026-11-14: in margin_score_onnet_move(NULL) WHERE is_parallel_to_onnet_fiber (172 rows) sorted by est_monthly_savings_usd DESC, 35360 is first at 2,307.07. It does not have the highest score: 10211 scores 99.
+
 ## Presenter note
 Scene 6 still opens trace tr-2b088edfed85d22b2db662a6c0a7c68e, the trace for the ticket that is approved live (DEC-037a). The stage dry-run trace is optional extra evidence.
