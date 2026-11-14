@@ -286,3 +286,14 @@ Tie-out: the same three circuits in `cdm_tmforum.revenue_assurance.margin_score_
 3. Rollback pointer: see `apps/margin-truth/REDEPLOY.md` l.16-20 (owner, cutoff Nov 16 12:00 CT, default = explorer OUT of scenes 1-7, dashboard explorer page used) and l.34 (Verify after deploy). A rollback section in REDEPLOY.md is still pending (DSN-F-S5-ROLLBACK-VERIFY-R1). The call is POST `/api/2.0/apps/lakelink-margin-truth/rollback` to deployment `01f1df6665471f5ebf858b80eb08a2bd`; it returns a NEW deployment id with `rollback_of_deployment_id`, so verify on that field, not on the id (agent_notes 1778, 1837).
 
 **Do not** quote the exact portfolio CM from the app explorer (build 01f1df66 shows 0 dp; DEC-040). Quote it from Margin Genie or the dashboard. MV check this run: MEASURE(contribution_margin) = 2,375,095,705.09 = raw margin_ledger_allocated 2,375,095,705.09 (517,032 rows).
+
+## S6b - Sales sees only its own accounts (row filter; owner @data-engineer, verified read-only 2026-11-14 ~22:20 UTC, COO-Q-20261114-94)
+
+Warehouse bf0baa637e887c80. Statement ids are real execution ids, not header times.
+
+* Attached: `margin_sales_row_filter ON (customer_id)` on margin_ledger_v2 (the MV base via margin_ledger_allocated), margin_ledger, margin_customers, margin_contracts. DESCRIBE stmt 01f1e078-9f81-1af0-ba34-a2883e214e65; information_schema.row_filters stmt 01f1e078-a0fe-151d-86cb-f927e32eb8ac.
+* Presenter / Finance path (not in group lakelink_margin_sales): MEASURE(contribution_margin) = 2,375,095,705.09, margin_ledger_v2 = 517,032 rows. Stmt 01f1e078-a1c3-19ae-9336-21c5b0137f5d. The filter does not change the headline.
+* Sales path (filter function evaluated as West rep sales.west@lakelinkfiber.example, is_sales = true): MV CM = 476,638,079.13, 1,992 ledger customers (stmt 01f1e078-a4e1-1b88-958f-a79a77298156); 103,176 rows, 0 out-of-region rows, raw CM 476,638,079.13 (stmt 01f1e078-a673-1c4a-bbc1-32004e290e45). An unassigned Sales principal sees 0 customers (stmt 01f1e078-a8ed-1994-a2ac-b7102e90d992).
+* Tie-out: the 5 regions sum to 2,375,095,705.09 and 517,032 rows (stmt 01f1e078-a7c8-1472-873b-928118610bd5).
+
+**Fallback (no live Sales identity on stage):** Show the DESCRIBE row filter line, then read: "A West Sales rep sees 103,176 ledger rows and 476.6M of contribution margin, which is only their accounts. Finance sees the full 2.375B. It is the same metric view with one governed filter." Do not log in as a synthetic rep, because the lakelinkfiber.example principals are not workspace users.
