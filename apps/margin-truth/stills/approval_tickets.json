@@ -1,0 +1,10 @@
+{
+  "generated": "2026-11-14 UTC",
+  "task": "DSN-F-STILLS-3TICKET-R1",
+  "source": "Lakebase telco-margin-analysis-app public.approval_tickets (TEST-* excluded, DEC-038)",
+  "rows": [
+    {"ticket_id": "GROOM-44c3612b69", "ticket_type": "offnet_grooming", "approver_role": "Ops", "title": "Move circuit 45040 on-net (Lakelink Fiber)", "circuit_id": "45040", "vendor_id": "00100000000265pAAA", "monthly_cost": "2880.05", "est_monthly_savings": "879.34", "agent_name": "lakelink-margin-grooming-agent", "agent_sp_name": null, "trace_id": "tr-d9fef3bfbebebdad7bedf0bb88cd0f83", "status": "pending", "created_at": "2026-11-13T00:25:29.422186+00:00"},
+    {"ticket_id": "GROOM-6d8f8ce31e", "ticket_type": "offnet_grooming", "approver_role": "Ops", "title": "Move circuit 98532 on-net (Lakelink Fiber)", "circuit_id": "98532", "vendor_id": "00100000000265hAAA", "monthly_cost": "2469.86", "est_monthly_savings": "469.00", "agent_name": "lakelink-margin-grooming-agent", "agent_sp_name": null, "trace_id": "tr-d9fef3bfbebebdad7bedf0bb88cd0f83", "status": "pending", "created_at": "2026-11-13T00:25:30.119499+00:00"},
+    {"ticket_id": "GROOM-1e655052ef", "ticket_type": "offnet_grooming", "approver_role": "Ops", "title": "Move circuit 10211 on-net (Lakelink Fiber)", "circuit_id": "10211", "vendor_id": "00100000000264YAAA", "monthly_cost": "1364.58", "est_monthly_savings": "1357.85", "agent_name": "lakelink-margin-grooming-agent", "agent_sp_name": null, "trace_id": "tr-2b088edfed85d22b2db662a6c0a7c68e", "status": "pending", "created_at": "2026-11-14T00:24:47.375519+00:00", "hero": true}
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "generated": "2026-11-14 UTC",
+  "task": "DSN-F-STILLS-3TICKET-R1",
+  "metric_view": "cdm_tmforum._metrics.margin_offnet_spend_mv",
+  "per_circuit": [
+    {"circuit_id": 10211, "vendor_id": "00100000000264YAAA", "vendor_name": "Partner Carrier 28", "score": 99, "monthly_cost": "1364.58", "est_monthly_savings": "1357.85", "hero": true},
+    {"circuit_id": 45040, "vendor_id": "00100000000265pAAA", "vendor_name": "Partner Carrier 55", "score": 65, "monthly_cost": "2880.05", "est_monthly_savings": "879.34"},
+    {"circuit_id": 98532, "vendor_id": "00100000000265hAAA", "vendor_name": "Partner Carrier 47", "score": 59, "monthly_cost": "2469.86", "est_monthly_savings": "469.00"}
+  ],
+  "grooming_candidates": 47,
+  "annual_offnet_cost_candidates": "1152342.12",
+  "est_annual_savings": "412539.96",
+  "ticket_vs_mv_diff": {
+    "GROOM-1e655052ef": {"monthly_cost": 0.0, "est_monthly_savings": 0.0},
+    "GROOM-44c3612b69": {"monthly_cost": 0.0, "est_monthly_savings": 0.0},
+    "GROOM-6d8f8ce31e": {"monthly_cost": 0.0, "est_monthly_savings": 0.0}
+  },
+  "portfolio_contribution_margin_check": "2375095705.09 (MEASURE(contribution_margin) from margin_ledger_mv, DEC-020)"
+}

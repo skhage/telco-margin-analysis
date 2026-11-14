@@ -1,0 +1,10 @@
+{
+  "generated": "2026-11-14 UTC",
+  "task": "DSN-F-STILLS-3TICKET-R1",
+  "source": "Lakebase telco-margin-analysis-app public.approval_audit (TEST-* excluded, DEC-038)",
+  "rows": [
+    {"audit_id": 4, "ticket_id": "GROOM-44c3612b69", "action": "created", "actor": "stephen.hage@databricks.com", "actor_role": "agent", "details": {"agent": "lakelink-margin-grooming-agent", "score": 65, "trace_id": "tr-d9fef3bfbebebdad7bedf0bb88cd0f83", "genie_basis": "sql_fallback", "identity_mode": "user_fallback"}, "at": "2026-11-13T00:25:29.422186+00:00"},
+    {"audit_id": 5, "ticket_id": "GROOM-6d8f8ce31e", "action": "created", "actor": "stephen.hage@databricks.com", "actor_role": "agent", "details": {"agent": "lakelink-margin-grooming-agent", "score": 59, "trace_id": "tr-d9fef3bfbebebdad7bedf0bb88cd0f83", "genie_basis": "sql_fallback", "identity_mode": "user_fallback"}, "at": "2026-11-13T00:25:30.119499+00:00"},
+    {"audit_id": 6, "ticket_id": "GROOM-1e655052ef", "action": "created", "actor": "stephen.hage@databricks.com", "actor_role": "agent", "details": {"agent": "lakelink-margin-grooming-agent", "score": 99, "stub_run": false, "trace_id": "tr-2b088edfed85d22b2db662a6c0a7c68e", "genie_basis": "margin_genie", "score_basis": "carrier_invoice", "identity_mode": "user_fallback"}, "at": "2026-11-14T00:24:47.375519+00:00"}
+  ]
+}

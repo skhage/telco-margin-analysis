@@ -1,0 +1,29 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Scene 5 frame 3 - After approval evidence (projected)</title>
+<!-- Lakelink Fiber design tokens: linked unchanged from the app source (apps/margin-truth/client/tokens.css). -->
+<link rel="stylesheet" href="../../client/tokens.css">
+<style>.still-note{background:#fff8e6;border:1px solid var(--llf-border-strong);border-radius:var(--llf-radius);padding:var(--llf-space-1) var(--llf-space-2);margin:var(--llf-space-2) var(--llf-space-3);font-size:13px}</style></head><body>
+<p class="still-note"><strong>PROJECTED state, not a recorded approval.</strong> Frame 3: the expected screen after Ops approves GROOM-1e655052ef. The ticket is still pending in Lakebase. Created audit row is real (audit_id 6); the Approved row is projected. Regenerated 2026-11-14 (DSN-F-STILLS-3TICKET-R1).</p>
+<header class="llf-header"><span class="llf-mark" aria-hidden="true"></span><h1>Lakelink Fiber | Margin Truth</h1></header>
+<nav class="llf-tabs" role="tablist" aria-label="Sections"><button class="llf-tab" role="tab" aria-selected="true">Approval queue</button><button class="llf-tab" role="tab" aria-selected="false">Margin explorer</button><button class="llf-tab" role="tab" aria-selected="false">Margin Genie</button></nav>
+<main><h2>Approval queue</h2>
+<div class="llf-card" role="status" aria-live="polite"><strong>Approved GROOM-1e655052ef.</strong> Decision recorded for stephen.hage@databricks.com (Ops). 2 tickets still pending.</div>
+<div class="llf-card llf-table-wrap"><table><caption class="llf-caption">2 tickets</caption>
+<thead><tr><th scope="col">Ticket</th><th scope="col">Circuit</th><th scope="col">Vendor</th><th scope="col" class="num">Monthly cost</th><th scope="col" class="num">Est. monthly savings</th><th scope="col">Status</th></tr></thead><tbody>
+<tr><td>GROOM-44c3612b69</td><td>45040</td><td>Partner Carrier 55</td><td class="num">$2,880.05</td><td class="num">$879.34</td><td><span class="llf-badge llf-badge--pending">Pending</span></td></tr>
+<tr><td>GROOM-6d8f8ce31e</td><td>98532</td><td>Partner Carrier 47</td><td class="num">$2,469.86</td><td class="num">$469.00</td><td><span class="llf-badge llf-badge--pending">Pending</span></td></tr>
+</tbody></table></div>
+<section class="llf-card" aria-labelledby="ev-h"><h3 id="ev-h">Evidence for GROOM-1e655052ef <span class="llf-badge llf-badge--approved">Approved</span></h3>
+<dl class="llf-evidence">
+<dt>Agent</dt><dd>lakelink-margin-grooming-agent</dd>
+<dt>Agent identity</dt><dd>User identity (fallback): stephen.hage@databricks.com</dd>
+<dt>MLflow trace</dt><dd><a href="#">tr-2b088edfed85d22b2db662a6c0a7c68e</a> (experiment 1235449331932066, genie_basis margin_genie)</dd>
+<dt>Circuit</dt><dd>10211, Partner Carrier 28 (00100000000264YAAA)</dd>
+<dt>Monthly cost / savings</dt><dd>$1,364.58 / $1,357.85</dd>
+<dt>Approver comment</dt><dd>Move on-net Q1</dd>
+</dl>
+<table><caption class="llf-caption">Audit record (app Lakebase public.approval_audit)</caption>
+<thead><tr><th scope="col">When (UTC)</th><th scope="col">Action</th><th scope="col">Actor</th><th scope="col">Role</th><th scope="col">Source</th></tr></thead><tbody>
+<tr><td>2026-11-14 00:24:47</td><td>created</td><td>stephen.hage@databricks.com</td><td>agent</td><td>Real (audit_id 6)</td></tr>
+<tr><td>At approval</td><td>approved</td><td>stephen.hage@databricks.com</td><td>Ops</td><td>Projected</td></tr>
+</tbody></table></section>
+</main></body></html>
