@@ -21,7 +21,11 @@ INSERT OVERWRITE cdm_tmforum.revenue_assurance.margin_sales_territory VALUES
  ('West','sales.west@lakelinkfiber.example','West Sales Rep','SYNTHETIC');
 -- For a live demo, replace one rep_principal with a real workspace test user and add that user to lakelink_margin_sales.
 
-CREATE OR REPLACE FUNCTION cdm_tmforum.revenue_assurance.margin_sales_can_see(p_customer_id BIGINT, p_principal STRING, p_is_sales BOOLEAN)
+CREATE OR REPLACE FUNCTION cdm_tmforum.revenue_assurance.margin_sales_can_see(
+  p_customer_id BIGINT COMMENT 'Lakelink Fiber customer identifier (PK of margin_customers). Region is derived via pmod(xxhash64(p_customer_id),5)+1 for territory lookup against margin_sales_territory.',
+  p_principal   STRING COMMENT 'Unity Catalog principal (user email) of the caller. Matched against margin_sales_territory.rep_principal to check region assignment for Sales visibility.',
+  p_is_sales    BOOLEAN COMMENT 'TRUE when the caller is a member of account group lakelink_margin_sales. Non-Sales callers (FALSE) always return TRUE (see every row).'
+)
 RETURNS BOOLEAN
 COMMENT 'Pure, testable visibility rule behind the Sales own-accounts row filter. telco_project=margin_analysis (DP-FN-TAG-COMMENT; UC functions cannot carry governed tags or TBLPROPERTIES).'
 RETURN NOT p_is_sales OR EXISTS (
@@ -29,7 +33,9 @@ RETURN NOT p_is_sales OR EXISTS (
   WHERE t.rep_principal = p_principal
     AND t.region = element_at(array('Northeast','Southeast','Central','Mountain','West'), CAST(pmod(xxhash64(p_customer_id),5)+1 AS INT)));
 
-CREATE OR REPLACE FUNCTION cdm_tmforum.revenue_assurance.margin_sales_row_filter(p_customer_id BIGINT)
+CREATE OR REPLACE FUNCTION cdm_tmforum.revenue_assurance.margin_sales_row_filter(
+  p_customer_id BIGINT COMMENT 'Lakelink Fiber customer identifier (PK of margin_customers). Passed to margin_sales_can_see together with current_user() and is_account_group_member(lakelink_margin_sales).'
+)
 RETURNS BOOLEAN
 COMMENT 'Row filter for margin_ tables: Sales (account group lakelink_margin_sales) sees only its own accounts; everyone else is unfiltered. telco_project=margin_analysis (DP-FN-TAG-COMMENT; UC functions cannot carry governed tags or TBLPROPERTIES).'
 RETURN cdm_tmforum.revenue_assurance.margin_sales_can_see(p_customer_id, current_user(), is_account_group_member('lakelink_margin_sales'));
