@@ -27,6 +27,7 @@ Identity caveat: `agent_sp_name` / `agent_sp_app_id` are NULL on both tickets. T
 1. Confirm REDEPLOY.md verify steps 1-4 pass.
 2. Leave both hero tickets `pending`. If either was approved in a rehearsal, ask @ml-engineer to re-draft. The dedup guard returns `existing_ticket` for pending tickets only.
 3. Browser at 1440x900 and 100% zoom, signed in as the presenter (the approver email is taken from x-forwarded-email).
+4. Do not open the Margin explorer tab in scenes 5-6 while the live deployment is 01f1df66 (check `active_deployment` in REDEPLOY.md step 1). That build shows contribution margin in whole dollars (for example Wavelength $1,815,451,951), not to the cent (DEC-030). Stay on the Approval queue tab and its evidence panel: they show only ticket monthly cost and savings, with no CM value. For CM, quote Margin Genie (USD 2,375,095,705.09) or the dashboard. If a later redeploy shows $2,375,095,705.09 in the explorer, you can remove this step. (DSN-REVIEW-COO-Q-20261114-1-FALLBACK)
 
 ## Storyboard
 | # | Screen | Click | Say | Expected on screen |

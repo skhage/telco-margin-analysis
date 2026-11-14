@@ -90,6 +90,12 @@ APP_ENDPOINT = "projects/telco-margin-analysis-app/branches/production/endpoints
 APP_HOST = "ep-calm-king-d2mq878u.database.us-east-1.cloud.databricks.com"
 AGENT_NAME = "lakelink-margin-grooming-agent"
 AGENT_SP_APP_ID = None  # set when SP lakelink-margin-grooming-agent exists (P4-GATEWAY-SP-TRACING)
+# INSERT CAP (COO-Q-20261114-2, 2026-11-14): live runs insert at most MAX_NEW_TICKETS tickets, and only for circuits in
+# INSERT_ALLOWLIST (None = any qualifying circuit). Hero live trace tr-2b088edfed85d22b2db662a6c0a7c68e inserted
+# GROOM-1e655052ef (circuit 10211, cost 1364.58, savings 1357.85, score 99) with allowlist {10211}, cap 1.
+INSERT_ALLOWLIST = None
+MAX_NEW_TICKETS = 1
+_inserted = []
 
 w = WorkspaceClient()
 mlflow.set_tracking_uri("databricks")
@@ -247,6 +253,9 @@ def draft_savings_ticket(circuit_id, vendor_id, monthly_cost, est_monthly_saving
             mlflow.get_current_active_span().set_attribute("dedup_existing_ticket", ex[0])
             return {"existing_ticket": ex[0], "status": "pending",
                     "note": "pending ticket already exists for this circuit; not re-inserted", **extra}
+    if (INSERT_ALLOWLIST is not None and int(circuit_id) not in INSERT_ALLOWLIST) or len(_inserted) >= MAX_NEW_TICKETS:
+        mlflow.get_current_active_span().set_attribute("insert_cap_block", True)
+        return {"error": "run insert cap/allowlist: ticket not drafted this run", **extra}
     if DRY_RUN:  # all guards passed; never write to the app queue in a dry run
         mlflow.get_current_active_span().set_attribute("dry_run", True)
         return {"dry_run": True, "would_insert": {"ticket_id": tid, "circuit_id": int(circuit_id), "vendor_id": vendor_id,
@@ -263,6 +272,8 @@ def draft_savings_ticket(circuit_id, vendor_id, monthly_cost, est_monthly_saving
              AGENT_NAME, AGENT_SP_APP_ID, AGENT_NAME if AGENT_SP_APP_ID else None, MLFLOW_EXPERIMENT_ID, trace_id))
         cur.execute("INSERT INTO public.approval_audit (ticket_id, action, actor, actor_role, details) VALUES (%s,'created',%s,'agent',%s::jsonb)",
                     (tid, me, json.dumps({"agent": AGENT_NAME, "trace_id": trace_id, "stub_run": STUB_MODE, **extra})))
+    _inserted.append(tid)
+    mlflow.get_current_active_span().set_attribute("inserted_ticket", tid)
     return {"ticket_id": tid, "status": "pending"}
 
 

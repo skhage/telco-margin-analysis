@@ -49,6 +49,30 @@ The allocation SQL ran on the real `margin_circuits` table (43,086 circuits, all
    * Agent: the grooming agent calls Margin Genie, so it reflects the change on its next call.
 5. Reset: put the original weights back and re-run step 1 to confirm the numbers match the baseline.
 
+## (b2) Canonical scene-3 statements (DEC-027) - verified read-only 2026-11-14 by @data-engineer (DE-S3-READONLY-PRECHECK)
+
+This section supersedes the field_ops candidate in (b) step 2. Run each statement in its own call. Run the change as the CEO (stephen.hage@databricks.com), interactively. Scheduled runs are blocked by the Auto Mode DML guardrail.
+
+Before: `margin_allocation_rules` has 8 rows. md5 checksum = `b16ddece39b066c1bc51c0a3d13e27ca`. customer_care/ticket_count = 0.700000 and customer_care/circuit_count = 0.300000. `MEASURE(contribution_margin)` from `cdm_tmforum._metrics.margin_ledger_mv` = 2,375,095,705.09.
+
+Change:
+
+    UPDATE cdm_tmforum.revenue_assurance.margin_allocation_rules SET weight = 0.900000 WHERE rule_id = 'MGN-ALR-customer_care-ticket_count-v1';
+
+Expected CM after the change: 2,360,713,702.39, a delta of -14,382,002.70. Cost to serve goes from 360,273,982.31 to 374,655,985.01.
+
+Revert:
+
+    UPDATE cdm_tmforum.revenue_assurance.margin_allocation_rules SET weight = 0.700000 WHERE rule_id = 'MGN-ALR-customer_care-ticket_count-v1';
+
+Expected CM after the revert: 2,375,095,705.09, to the cent. The checksum must be `b16ddece39b066c1bc51c0a3d13e27ca` again.
+
+Checksum SQL:
+
+    SELECT md5(concat_ws('||', collect_list(r))) FROM (SELECT concat_ws('|', *) r FROM cdm_tmforum.revenue_assurance.margin_allocation_rules ORDER BY rule_id)
+
+Note for the talk track: this change does not conserve the pool. The customer_care weights sum to 1.20 after the change, so allocated care cost rises by 20% of the 71,910,000.00 customer_care pool (14,382,000.00 plus 2.70 of per-row rounding). Present it as "Finance raises the care-cost weight", not as moving the same cost between drivers. A pool-conserving variant (ticket 0.90 and circuit 0.10) moves CM by only -26.06, which is too small to show on stage.
+
 ## (c) MV depth - pending deployment
 Counts of comment, display_name, format and synonyms must be read from the DEPLOYED view, not from the YAML. Status 2026-11-12: 0 margin_ objects in cdm_tmforum._metrics. Suite MVs (offnet_spend, renewal_floor, segment_growth): not deployed. They are blocked on P2-MV-MARGIN-LEDGER, which waits on P1-LEDGER-GOLD-FASTPATH.
 
