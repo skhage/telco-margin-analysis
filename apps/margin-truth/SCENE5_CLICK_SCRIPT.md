@@ -61,9 +61,9 @@ Workspace copy of record. The volume copy in /Volumes/cdm_tmforum/revenue_assura
 | Frame | Caption |
 | --- | --- |
 | frame1_queue | Ops Approval queue, Pending: 3 tickets, newest first: GROOM-1e655052ef (10211), GROOM-6d8f8ce31e (98532), GROOM-44c3612b69 (45040). No TEST rows on screen. |
-| frame2_detail | GROOM-1e655052ef, circuit 10211, vendor Partner Carrier 28 (00100000000264YAAA): monthly cost 1,364.58, est. monthly savings 1,357.85. Comment "Move on-net Q1", then Approve. |
+| frame2_detail | GROOM-1e655052ef, circuit 10211, vendor Partner Carrier 28 (00100000000264YAAA): monthly cost $1,364.58, est. monthly savings $1,357.85. Comment "Move on-net Q1", then Approve. |
 | frame3_evidence (PROJECTED) | "Approved by Ops. Decision recorded in the audit log." 2 tickets remain pending (98532, 45040). Evidence panel: agent lakelink-margin-grooming-agent, audit row Approved, trace tr-2b088edfed85d22b2db662a6c0a7c68e. |
-| tie-out row | Ticket values = MEASURE(monthly_offnet_cost) / MEASURE(est_monthly_savings) on cdm_tmforum._metrics.margin_offnet_spend_mv: 10211 1,364.58 / 1,357.85; 45040 2,880.05 / 879.34; 98532 2,469.86 / 469.00 (diff 0.00, 2026-11-14). |
+| tie-out row | Ticket values = MEASURE(monthly_offnet_cost) / MEASURE(est_monthly_savings) on cdm_tmforum._metrics.margin_offnet_spend_mv: 10211 $1,364.58 / $1,357.85; 45040 $2,880.05 / $879.34; 98532 $2,469.86 / $469.00 (diff 0.00, 2026-11-14). |
 
 ## Recording tips (fallback)
 Record scenes 5-6 as one take of about 90 s. Also take a still screenshot of steps 5 and 6 as a second-level fallback (plan: "recorded walkthrough of scenes 1 to 6").
