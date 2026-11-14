@@ -1469,11 +1469,29 @@
                   "fields": [
                     {
                       "fieldName": "sum(contribution_margin)",
-                      "displayName": "Contribution Margin"
+                      "displayName": "Contribution Margin",
+                      "format": {
+                        "type": "number-currency",
+                        "currencyCode": "USD",
+                        "abbreviation": "compact",
+                        "decimalPlaces": {
+                          "type": "max",
+                          "places": 1
+                        }
+                      }
                     },
                     {
                       "fieldName": "sum(revenue)",
-                      "displayName": "Revenue"
+                      "displayName": "Revenue",
+                      "format": {
+                        "type": "number-currency",
+                        "currencyCode": "USD",
+                        "abbreviation": "compact",
+                        "decimalPlaces": {
+                          "type": "max",
+                          "places": 1
+                        }
+                      }
                     }
                   ],
                   "format": {
@@ -1660,15 +1678,42 @@
                   "fields": [
                     {
                       "fieldName": "sum(network_expense)",
-                      "displayName": "Network Expense"
+                      "displayName": "Network Expense",
+                      "format": {
+                        "type": "number-currency",
+                        "currencyCode": "USD",
+                        "abbreviation": "compact",
+                        "decimalPlaces": {
+                          "type": "max",
+                          "places": 1
+                        }
+                      }
                     },
                     {
                       "fieldName": "sum(cost_to_serve)",
-                      "displayName": "Cost to Serve"
+                      "displayName": "Cost to Serve",
+                      "format": {
+                        "type": "number-currency",
+                        "currencyCode": "USD",
+                        "abbreviation": "compact",
+                        "decimalPlaces": {
+                          "type": "max",
+                          "places": 1
+                        }
+                      }
                     },
                     {
                       "fieldName": "sum(contribution_margin)",
-                      "displayName": "Contribution Margin"
+                      "displayName": "Contribution Margin",
+                      "format": {
+                        "type": "number-currency",
+                        "currencyCode": "USD",
+                        "abbreviation": "compact",
+                        "decimalPlaces": {
+                          "type": "max",
+                          "places": 1
+                        }
+                      }
                     }
                   ],
                   "format": {

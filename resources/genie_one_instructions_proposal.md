@@ -69,7 +69,7 @@ Source of truth: `src/semantics/glossary_pages.json` v1.0. Coverage column = whe
 
 * CEO approval of the section 1 block before anyone edits `/Workspace/.genie_workspace_instructions.md` (filed: PM-GENIE-ONE-CEO-CAPTURE, @pm).
 * Genie One itself cannot be driven by API (no REST endpoint for the workspace chat). The 4 questions must be asked once interactively in Genie One by the CEO, with screenshots, and compared with section 6. If that hasn't happened by Nov 14 18:00 UTC, the demo uses Margin Genie only (@pm handoff note 559).
-* Glossary Pages are still DRAFT (DP-GLOSSARY-CERTIFY, @data-planner).
+* Glossary Pages (2026-11-14 re-GET, COO-Q-20261114-35): 15 PUBLISHED, Rate Variance 079d1b7a DRAFT (DEC-031). None are certified: the pages API has no certification field, so a human must certify in the UI (CEO gate 9 DP-ESC-GLOSSARY-CERTIFY, cutoff Nov 15 12:00 CT; DEC-018 default = uncertified PUBLISHED, on stage say 'published and owned by Finance', not 'certified'). Only the 5 margin_ MVs + margin_ledger_allocated carry system.certification_status = certified.
 * Closed since v1.0: MV metadata (DP-MV-GLOSSARY-FIELDS), $1B Wall and Grooming in Margin Genie instructions (verified in text_instructions on 2026-11-13).
 
 ## 6. Expected answers for the Genie One capture (verified 2026-11-13)

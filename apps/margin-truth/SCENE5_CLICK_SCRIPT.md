@@ -43,7 +43,7 @@ Identity caveat: `agent_sp_name` / `agent_sp_app_id` are NULL on all 3 hero tick
 | 4 | Same row | Type "Move on-net Q1" in Comment (optional), then Approve | "Agents act, people approve." | Row leaves the pending list. Screen reader announcement: "<ticket title> approved by Ops. Decision recorded in the audit log." Focus moves to "Evidence for GROOM-1e655052ef" |
 | 5 | Evidence for GROOM-1e655052ef | Opens after the decision | "Every action has an identity and a record." | Agent: lakelink-margin-grooming-agent. Audit row: action Approved, actor = presenter email, role Ops, timestamp, details "Comment: Move on-net Q1" |
 | 6 | Evidence panel | Click "Open trace <id>" (the id is this ticket's own approval_tickets.trace_id) | "Here is every step the agent took." | MLflow trace tr-2b088edfed85d22b2db662a6c0a7c68e: ask_margin_genie (real Margin Genie call), score_onnet_move, draft_savings_ticket (INSERT) |
-| 7 | Trace span `ask_margin_genie` | Expand | "Same Margin Genie and same contribution margin as the dashboard." | Genie question and answer |
+| 7 | Trace span `ask_margin_genie` | Expand | "The agent asked the same Margin Genie the CFO used." | Genie question and answer (no contribution margin claim here; exact CM is claimed only on Margin Genie and the dashboard, DEC-040) |
 | 8 | Back to app | None (do NOT approve the other tickets) | "Two more candidates, 45040 and 98532, are waiting for Ops." | 2 tickets remain pending for Ops: GROOM-6d8f8ce31e (98532) and GROOM-44c3612b69 (45040) |
 
 Approved on stage: $1,358 a month on screen (exact 1,357.85). Still pending after scene 5: 879.34 + 469.00 = 1,348.34 a month.
