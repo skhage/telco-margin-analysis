@@ -93,7 +93,9 @@ AGENT_SP_APP_ID = None  # set when SP lakelink-margin-grooming-agent exists (P4-
 # INSERT CAP (COO-Q-20261114-2, 2026-11-14): live runs insert at most MAX_NEW_TICKETS tickets, and only for circuits in
 # INSERT_ALLOWLIST (None = any qualifying circuit). Hero live trace tr-2b088edfed85d22b2db662a6c0a7c68e inserted
 # GROOM-1e655052ef (circuit 10211, cost 1364.58, savings 1357.85, score 99) with allowlist {10211}, cap 1.
-INSERT_ALLOWLIST = None
+# STAGE DEFAULT (ML-S5-ALLOWLIST-DEFAULT / COO-Q-20261114-96, 2026-11-14): module default = scene-5 stage config
+# {35360} (resources/scene5_stage_run_config.md). Set to None ONLY for a deliberate non-stage run.
+INSERT_ALLOWLIST = {35360}
 MAX_NEW_TICKETS = 1
 _inserted = []
 

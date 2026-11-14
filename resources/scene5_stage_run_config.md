@@ -20,6 +20,7 @@ Option 1 (default, zero side effects):
 * DRY_RUN = True
 * INSERT_ALLOWLIST = {35360}
 * MAX_NEW_TICKETS = 1
+* Code default aligned 2026-11-14 23:22 UTC (ML-S5-ALLOWLIST-DEFAULT / COO-Q-20261114-96): agents/margin_grooming_agent.py now ships INSERT_ALLOWLIST = {35360} (md5 7c7a2ed87ff2653cdc4d5b1cd7691800). No presenter step needed to set it. Fresh DRY_RUN trace tr-7423ff956174e02766a1427b6fde2dcd: would_insert 35360, CM 2,375,095,705.09; queue unchanged (4 rows, 3 pending non-TEST, 0 for 35360).
 
 Option 2 (only if the CEO wants a real ticket to appear live):
 * DRY_RUN = False
