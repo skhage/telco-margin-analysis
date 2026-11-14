@@ -9,8 +9,9 @@ Owner: @pm. Created 2026-11-13 06:10 UTC (COO-Q-20261113-25). This file is the C
 | 3 | Agent SP (P4-GATEWAY-SP-TRACING) | S6 identity | Command B below (create SP lakelink-margin-grooming-agent + grants) | 4 min | Nov 15 12:00 CT -> user-identity trace (ML-GROOMING-FALLBACK-PATH) |
 | 4 | ~~Discover domain quota (DP-ESC-DOMAIN-QUOTA)~~ DONE 2026-11-13: domain 2abc9194-aed9-4088-bfa6-4b4d33870ebd verified by GET (@pm run #9). No CEO action. | - | - | - | - |
 | 5 | Genie One capture (PM-GENIE-ONE-CEO-CAPTURE) | S1/S4 Genie One claim | Steps C below (2 questions, 2 screenshots) | 3 min | Nov 14 18:00 UTC -> Margin Genie only on stage, no Genie One claim |
-| 6 | Delete TEST ticket (TEST-GROOM-4d4c099b0e) | S5 queue cleanliness | SQL D below on app Lakebase (optional: the UI filter APP-HIDE-TEST-TICKETS already hides it) | 1 min | Nov 16 12:00 CT -> UI filter (already built) |
+| 6 | ~~Delete TEST ticket~~ CLOSED 2026-11-14 by DEC-038: no CEO action. The row stays, because approval_audit FK audit_id=3 references it. The live SHOW_TEST_TICKETS=false filter hides it, so the Ops queue shows exactly 3 tickets. Do NOT run SQL D. | - | - | - | - |
 | 7 | @devops approval gate (DEVOPS-JOBS-ONLY-FALLBACK) | Leave-behind DAB | Reply "approve DEVOPS-JOBS-ONLY-FALLBACK" when a @devops run asks, or set the task in_progress on the board | 1 min | Nov 16 12:00 CT -> DAB shown as source in git only |
+| 9 | Certify glossary pages (DP-ESC-GLOSSARY-CERTIFY) | S3 trust claim | Discover > Margin domain > Glossary: certify the 15 PUBLISHED Margin pages (ids in agent_notes 1041). Certification is UI-only; the API has no field for it (note 1185) | 5 min | Nov 15 12:00 CT -> say 'published and owned by Finance', not 'certified' |
 | 8 | Delete stale pipeline (DE-DELETE-STALE-PIPELINE) | ONE-pipeline rule, S2 lineage clarity | In the Pipelines UI, delete pipeline ccea7e91-e657-4168-82fe-588f4e6437d5 (IDLE, owns 0 UC datasets; live pipeline is 20960984). Agent deletes are blocked by the safety guardrail. | 1 min | Nov 14 18:00 UTC -> ccea7e91 stays IDLE, excluded from demo, retire after demo (PM-STALE-PIPELINE-FALLBACK) |
 
 ## SQL A: app SP grants (gate 1)
@@ -37,7 +38,7 @@ GRANT USE SCHEMA, SELECT ON SCHEMA cdm_tmforum._metrics TO `lakelink-margin-groo
 3. Ask: "What is total contribution margin by product family?" Expected total 2,375,095,705.09.
 4. Screenshot both answers plus the SQL panel, showing MEASURE(contribution_margin) from cdm_tmforum._metrics.margin_ledger_mv. Save them to /Volumes/cdm_tmforum/revenue_assurance/margin_documents/rehearsal/genie_one/.
 
-## SQL D: TEST ticket delete (gate 6, optional)
+## SQL D: TEST ticket delete (gate 6, RETIRED by DEC-038, do not run)
 ```sql
 DELETE FROM public.approval_tickets WHERE ticket_id = 'TEST-GROOM-4d4c099b0e';
 ```
@@ -69,6 +70,22 @@ Update 2026-11-13 @pm run #9: gate 4 closed; P2-GLOSSARY-PAGES and P2-DISCOVER-D
 | S2 Answer -> ledger -> lineage -> PDF | GO | margin_ledger_allocated repointed to margin_ledger_v2, MV = 2,375,095,705.09 | none (lineage audit P5-LINEAGE-AUDIT open @qa) | fast path stays canonical if v2 drifts |
 | S3 Metric view + live rule change | GO (simulated), live UPDATE at rehearsal | read-only sim: 0.70->0.90 gives 2,360,713,702.39 (@ml-engineer) | rehearsal UPDATE | Nov 17 -> pre-recorded clip |
 | S4 One Genie Ops/Sales/Marketing | GO on accuracy, display FIX open (run #12) | 9 Genie sources, 13/13 benchmark SQLs correct; pct/USD/boolean display fails (DSN-GENIE-FORMAT-R2); Ops label DEC-026 (DA-OPS-SAVINGS-LABEL-FIX) | none (agent work) | Nov 15 12:00 CT -> answer from margin_ledger_mv + dims |
-| S5 Grooming agent -> approval app | NO-GO live | agent GO (47 candidates, heroes 45040/98532); app SP has zero table privileges | Gates 1, 2, 6 | Nov 15 12:00 CT -> recorded scene 5 |
-| S6 Trace / SP / audit | CONDITIONAL | trace tr-7e87cf4df0dfdbf4a2ae39e1f1ab0478 (user identity; open from experiment 1235449331932066, per SCENE5_CLICK_SCRIPT.md:18). Say 'user identity', not 'service principal'; say 'guardrails are on', not 'we saw it block'. Sales row filter: GO if account group lakelink_margin_sales exists by Nov 15 12:00 CT (log in as a member, expect 103,176 of 517,032 rows); else GO-FALLBACK, say: "Sales reps are filtered by margin_sales_row_filter; West rep simulation shows 103,176 of 517,032 rows" | Gate 3 + PM-SALES-TEST-PRINCIPAL | Nov 15 12:00 CT -> user-identity trace + Sales SQL simulation |
-| S7 $1B Wall cards | AT RISK | dashboard 01f1df1950c51bd68e87ace31632c2bf p2 live on wall MV | none | P6-CHALLENGE-CARDS due Nov 16 12:00 CT |
+| S5 Grooming agent -> approval app | NO-GO live | agent GO (47 candidates). Pre-roll queue = 3 pending (45040, 98532, 10211), with TEST hidden (DEC-037a, DEC-038). Live approve target GROOM-1e655052ef (10211). App SP has zero table privileges | Gates 1, 2 | Nov 15 12:00 CT -> recorded scene 5 |
+| S6 Trace / SP / audit | CONDITIONAL | hero trace tr-2b088edfed85d22b2db662a6c0a7c68e (DEC-037a; earlier trace tr-7e87cf4df0dfdbf4a2ae39e1f1ab0478 is superseded) (user identity; open from experiment 1235449331932066, per SCENE5_CLICK_SCRIPT.md:18). Say 'user identity', not 'service principal'; say 'guardrails are on', not 'we saw it block'. Sales row filter: GO if account group lakelink_margin_sales exists by Nov 15 12:00 CT (log in as a member, expect 103,176 of 517,032 rows); else GO-FALLBACK, say: "Sales reps are filtered by margin_sales_row_filter; West rep simulation shows 103,176 of 517,032 rows" | Gate 3 + PM-SALES-TEST-PRINCIPAL | Nov 15 12:00 CT -> user-identity trace + Sales SQL simulation |
+| S7 $1B Wall cards | GO | dashboard 01f1df1950c51bd68e87ace31632c2bf p2 live on wall MV; P6-CHALLENGE-CARDS completed | none | - |
+
+## All-defaults run sheet (plan of record if no CEO session; @pm run #27, 2026-11-14 02:10 UTC, answers COO-Q-20261114-13 / COO-Q-20261113-73)
+
+Owner: @pm. This sheet becomes the plan of record gate by gate at each cutoff below, with no further escalation. Final become-plan time: Nov 15 18:00 UTC (12:00 CT). Readiness verifier on Nov 18: @qa (5-surface same-number matrix + 13/13 eval), with @coo grading.
+
+| Scene | All-defaults status | Default applied (DEC) | Line said on stage |
+| --- | --- | --- | --- |
+| S1 | GO-FALLBACK | Gate 5 expires Nov 14 18:00 UTC -> Margin Genie only (DEC-029b) | "Margin Genie answers in seconds: contribution margin USD 2,375,095,705.09, from one metric view." (No Genie One claim.) |
+| S2 | GO | Gate 8 expires Nov 14 18:00 UTC -> ccea7e91 stays IDLE and excluded, retired after the demo (DEC-029a) | "One pipeline, Bronze to Gold, and lineage back to the carrier invoice PDF." (Show pipeline 20960984 only.) |
+| S3 | GO-FALLBACK | I1 not run by Nov 15 12:00 CT -> definition + read-only simulation (DEC-027(3)) | "Finance owns the definition once. If care moves to 0.90 weight on tickets, margin moves to 2,360,713,702.39, as this simulation shows." (No 'change the rule live'.) |
+| S4 | GO | none (agent work done, eval 13/13) | Ops: "off-net circuits that run next to our own fiber" -> 47 candidates, 1,152,342.12 a year paid, 412,539.96 a year savings (DEC-026). Sales 586. Marketing Commercial. |
+| S5 | GO-FALLBACK | Gate 1 expires Nov 15 12:00 CT -> recorded scene 5 (DEC-025). The app stays on build 01f1df66, which shows CM at 0 dp (DEC-030/033 talk track) | "The agent drafted three savings tickets. Ops approves circuit 10211." |
+| S6 | GO-FALLBACK | Gate 3 expires Nov 15 12:00 CT -> user-identity trace tr-2b088edf (ML-GROOMING-FALLBACK-PATH) | "Every step is traced under a governed identity, and guardrails are on." Say 'user identity', not 'service principal'. Sales: "margin_sales_row_filter: West rep simulation shows 103,176 of 517,032 rows." |
+| S7 | GO | none | "Find your biggest lever on the $1B Wall." |
+
+Delivery: no path has reached the CEO yet. margin_ceo_slack is not created (checked 02:05 UTC 11-14), and the Slack MCP connector has read/search tools only. This sheet and status_updates (ceo_escalation) are the only channels.

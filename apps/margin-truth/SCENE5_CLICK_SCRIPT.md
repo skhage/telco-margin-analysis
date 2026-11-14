@@ -23,7 +23,7 @@ GATED-STATE OVERRIDE (COO-Q-20261113-77, @ml-engineer 2026-11-13): while ML-HERO
 
 Agent: `approval_tickets.agent_name` = `lakelink-margin-grooming-agent` on both hero tickets (checked 2026-11-13, DSN-SCENE5-R1). The app's Agent column and the evidence panel show this value. `lakelink_offnet_grooming_agent` is only the root span name inside the MLflow trace (step 6). Vendor names come from `cdm_tmforum.revenue_assurance.margin_vendors`. If the app cannot read that table, the Vendor column shows only the ID.
 
-Both hero tickets come from ONE grooming-agent run, so they share one trace. TEST-GROOM-4d4c099b0e is hidden by `SHOW_TEST_TICKETS=false`. Its row is kept: DEC-037a asked to purge it, but approval_audit row 3 references it through FK approval_audit_ticket_id_fkey (NO ACTION), so DELETE fails without touching approval_audit (escalated to @pm, APP-SCENE5-3TICKET-SCRIPT). On screen it stays hidden either way.
+Both hero tickets come from ONE grooming-agent run, so they share one trace. TEST-GROOM-4d4c099b0e is hidden by `SHOW_TEST_TICKETS=false`. Its row is kept by decision DEC-038 (no DELETE, no UPDATE; approval_audit row 3 references it through FK approval_audit_ticket_id_fkey and is never touched). "No TEST rows" means no TEST rows on screen. Verified 2026-11-14 ~03:1x UTC: pending = GROOM-44c3612b69, GROOM-6d8f8ce31e, GROOM-1e655052ef + hidden TEST-GROOM-4d4c099b0e.
 As of 2026-11-13 the shared trace on both hero tickets (experiment 1235449331932066) has state OK, 11 spans, and ran about 36 s. A re-draft (ML-HERO-REDRAFT-LIVE-GENIE) gives a new trace id. The panel picks it up automatically, so this script needs no edit. Span order: `lakelink_offnet_grooming_agent`, `gateway_chat`, `ask_margin_genie`, `score_onnet_move`, `score_onnet_move`, `gateway_chat`, `draft_savings_ticket`, `score_onnet_move`, `draft_savings_ticket`, `score_onnet_move`, `gateway_chat` (4 scoring calls, 2 ticket drafts).
 Identity caveat: `agent_sp_name` / `agent_sp_app_id` are NULL on both tickets. The trace was run under the user identity (user_fallback). Until an agent SP exists (cutoff Nov 15 12:00 CT, fallback ML-GROOMING-FALLBACK-PATH), use the COO-Q-20261113-46 (c) line: "Today the agent runs under my own identity, so every model call, Genie query and ticket is logged against a named person. In production it runs as its own service principal, lakelink-margin-grooming-agent, with least-privilege grants on the margin tables only." Do not claim an SP on screen. If tickets are re-drafted with AGENT_SP_APP_ID set, the panel shows the SP and the line changes to the SP.
 
@@ -53,6 +53,16 @@ Approved tickets cannot be re-approved (409, not pending).
 2. Ask @ml-engineer to re-draft: run the grooming agent with DRY_RUN=False against the live Margin Genie space. Expect exactly 2 new pending tickets (45040, 98532) sharing one NEW trace_id.
 3. Re-read `approval_tickets.trace_id` (see the Trace rule above). Do not copy an old id into this script.
 Never DELETE or UPDATE approval_audit rows or decided tickets.
+
+## Stills pack captions (DEC-025 / DEC-037a / DEC-038, 3-ticket queue)
+Workspace copy of record. The volume copy in /Volumes/cdm_tmforum/revenue_assurance/margin_documents/recordings/scene5/ is deferred (scheduled runs cannot write the volume); regenerate post-freeze or by the CEO.
+
+| Frame | Caption |
+| --- | --- |
+| frame1_queue | Ops Approval queue, Pending: 3 tickets, newest first: GROOM-1e655052ef (10211), GROOM-6d8f8ce31e (98532), GROOM-44c3612b69 (45040). No TEST rows on screen. |
+| frame2_detail | GROOM-1e655052ef, circuit 10211, vendor Partner Carrier 28 (00100000000264YAAA): monthly cost 1,364.58, est. monthly savings 1,357.85. Comment "Move on-net Q1", then Approve. |
+| frame3_evidence (PROJECTED) | "Approved by Ops. Decision recorded in the audit log." 2 tickets remain pending (98532, 45040). Evidence panel: agent lakelink-margin-grooming-agent, audit row Approved, trace tr-2b088edfed85d22b2db662a6c0a7c68e. |
+| tie-out row | Ticket values = MEASURE(monthly_offnet_cost) / MEASURE(est_monthly_savings) on cdm_tmforum._metrics.margin_offnet_spend_mv: 10211 1,364.58 / 1,357.85; 45040 2,880.05 / 879.34; 98532 2,469.86 / 469.00 (diff 0.00, 2026-11-14). |
 
 ## Recording tips (fallback)
 Record scenes 5-6 as one take of about 90 s. Also take a still screenshot of steps 5 and 6 as a second-level fallback (plan: "recorded walkthrough of scenes 1 to 6").

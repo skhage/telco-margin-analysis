@@ -83,13 +83,15 @@ GROUP BY ALL HAVING cm_pct < margin_floor_pct ORDER BY term_end;
 ```
 
 ### Marketing - "Which segments have the highest margin and the most room to grow?"
-"Room to grow" (DEC-013) = segments whose cm_pct is above the portfolio average AND whose revenue share is below their customer-count share (margin_segment_growth_mv when deployed; until then the live space computes it from margin_ledger_mv). Base query:
+"Room to grow" (DEC-013) = segments whose cm_pct is above the portfolio average AND whose revenue share is below their customer-count share. Source: the deployed metric view `cdm_tmforum._metrics.margin_segment_growth_mv` (CM comes from margin_ledger_mv, DEC-002). Base query (same as live example SQL and benchmark; no date filter, full ledger range 2025-11 to 2026-10):
 ```sql
-SELECT segment, MEASURE(contribution_margin) AS contribution_margin, MEASURE(cm_pct) AS cm_pct, MEASURE(customer_count) AS customers
-FROM cdm_tmforum._metrics.margin_ledger_mv
-WHERE ledger_month >= ADD_MONTHS(DATE_TRUNC('MONTH', CURRENT_DATE()), -12)
-GROUP BY ALL ORDER BY cm_pct DESC;
+SELECT segment, room_to_grow, ROUND(MEASURE(contribution_margin),2) AS contribution_margin_usd,
+  ROUND(MEASURE(cm_pct)*100,1) AS contribution_margin_pct, ROUND(ANY_VALUE(portfolio_cm_pct)*100,1) AS portfolio_cm_pct,
+  ROUND(MEASURE(revenue_share)*100,1) AS revenue_share_pct, ROUND(MEASURE(customer_share)*100,1) AS customer_share_pct,
+  MEASURE(customer_count) AS customers
+FROM cdm_tmforum._metrics.margin_segment_growth_mv GROUP BY ALL ORDER BY contribution_margin_pct DESC;
 ```
+**Thin-lead framing (DEC-032, live instruction 8a since 2026-11-14):** Commercial is the only room-to-grow segment, and the lead is thin. Exact numbers: CM % 54.35% vs portfolio 54.14% (+0.21 pts); revenue share 34.43% vs customer share 34.46% (-0.03 pts); 3,424 customers; CM 821,108,369.20. The table shows 1 dp (54.4 / 54.1 / 34.4 / 34.5), per the design token standard. Talk track: "Commercial is a thin lead, not a big gap: it earns slightly above the portfolio margin and still has a slightly smaller share of revenue than of customers. That is where Marketing looks first." Never call it a large or decisive gap. No data change before Nov 19 (DEC-032).
 
 ## Variants to add as benchmarks (8)
 1. What was total contribution margin last quarter? 2. Margin % for legacy vs strategic? 3. Top 10 customers by negative contribution margin. 4. Off-net spend by vendor this month. 5. How many off-net circuits are grooming candidates? 6. Revenue leakage by region. 7. Carrier rate variance by vendor. 8. Contribution margin trend by month for Legacy Voice.
