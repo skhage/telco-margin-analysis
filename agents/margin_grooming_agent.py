@@ -262,6 +262,29 @@ def score_onnet_move(circuit_id):
     return proxy_score(circuit_id)
 
 
+# COST/VENDOR GUARD (ML-GUARD-COST-VENDOR-RECHECK / COO-Q-20261115-50, 2026-11-15): before any ticket is drafted, ALL
+# three agent-supplied values must match margin_score_onnet_move for the circuit: est_monthly_savings and monthly_cost
+# within +/-0.01 USD, and vendor_id exactly. Savings <= 0 is refused. Known answer: 35360 cost 2513.61 / savings 2307.07.
+def guard_mismatch(chk, vendor_id, monthly_cost, est_monthly_savings):
+    """Return a refusal reason string, or None when the agent values match the scoring function."""
+    if not chk:
+        return "no score row"
+    fn = chk[0]
+    try:
+        sav, cost = float(est_monthly_savings), float(monthly_cost)
+    except (TypeError, ValueError):
+        return "non-numeric monthly_cost or est_monthly_savings"
+    if sav <= 0:
+        return "savings <= 0"
+    if abs(float(fn["est_monthly_savings_usd"]) - sav) > 0.01:
+        return "est_monthly_savings mismatch"
+    if abs(float(fn["monthly_offnet_cost_usd"]) - cost) > 0.01:
+        return "monthly_cost mismatch"
+    if str(vendor_id) != str(fn["vendor_id"]):
+        return "vendor_id mismatch"
+    return None
+
+
 @mlflow.trace(name="draft_savings_ticket", span_type=SpanType.TOOL)
 def draft_savings_ticket(circuit_id, vendor_id, monthly_cost, est_monthly_savings, rationale):
     prefix = "TEST-GROOM-" if STUB_MODE else "GROOM-"
@@ -273,9 +296,10 @@ def draft_savings_ticket(circuit_id, vendor_id, monthly_cost, est_monthly_saving
     extra = {}
     if not STUB_MODE:  # guard: agent must copy tool values, never invent them
         chk = score_onnet_move(int(circuit_id))
-        if (not chk or float(est_monthly_savings) <= 0
-                or abs(float(chk[0]["est_monthly_savings_usd"]) - float(est_monthly_savings)) > 0.01):
-            return {"error": "values do not match score_onnet_move or savings <= 0; ticket not drafted"}
+        bad = guard_mismatch(chk, vendor_id, monthly_cost, est_monthly_savings)
+        if bad:
+            mlflow.get_current_active_span().set_attributes({"guard_refused": True, "guard_reason": bad})
+            return {"error": f"values do not match score_onnet_move ({bad}); ticket not drafted"}
         extra = {"identity_mode": "sp" if AGENT_SP_APP_ID else "user_fallback", "score_basis": chk[0]["score_basis"],
                  "genie_basis": _last_basis.get("genie_basis", "margin_genie"), "score": int(chk[0]["score"])}
     if not STUB_MODE:

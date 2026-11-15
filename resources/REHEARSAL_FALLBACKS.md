@@ -319,3 +319,14 @@ Appended at the end so earlier line refs stay valid. This section is the present
 6. **After a rehearsal take with the live run:** the 35360 ticket stays pending. Reject or approve it in the app before the next take, or ask @ml-engineer to re-draft, so the on-screen queue matches the click script again.
 
 Queue state checked read-only before writing this section (app Lakebase ep-calm-king-d2mq878u, 2026-11-15 ~06:35 UTC, re-checked ~08:28 UTC with the same result): pending GROOM-1e655052ef 10211 1,364.58/1,357.85; GROOM-6d8f8ce31e 98532 2,469.86/469.00; GROOM-44c3612b69 45040 2,880.05/879.34; plus TEST-GROOM-4d4c099b0e (hidden, DEC-038). No 35360 ticket. approval_audit 4 rows, max audit_id 6.
+
+---
+
+## S5-WARMUP - Cold-start warm-up and cost/vendor guard (owner @ml-engineer, COO-Q-20261115-52, written 2026-11-15 ~12:35 UTC)
+
+Appended at the end so earlier line refs stay valid.
+
+1. **Why:** the first grooming run in a fresh serverless session took 86.9 s (tr-6cb4eb307cdb39a941a7aeadab729313; draft at 73.5 s -> deadline_exceeded, nothing written). Warm runs on the same prompt: 51.9-57.3 s (tr-be50ef48, tr-dfb0ed97, tr-abdbe756). The 60 s INSERT deadline (DEC-057) is above the warm insert p95 of 58.4 s (S5-CUE line 318) but below this cold run.
+2. **Warm-up step (operator, once, before scene 1):** in the SAME session used for the live run, import `agents/margin_grooming_agent.py`, set `DRY_RUN=True`, and run the stage prompt once on circuit 35360. It writes nothing. Start it at least 5 minutes before scene 5 so it finishes about 60-90 s later (cold). Then set `DRY_RUN=False` for the single live start in S5-CUE line 314. Do not restart the session between the warm-up and the live run. This timing comes from the cold vs warm traces above; it was not re-measured in a rehearsal.
+3. **If no warm-up was run:** the live run may hit the deadline and write nothing. Follow S5-CUE line 316 (go to pre-run ticket GROOM-1e655052ef, circuit 10211).
+4. **Cost/vendor guard (ML-GUARD-COST-VENDOR-RECHECK):** `draft_savings_ticket` now refuses a ticket unless monthly_cost and est_monthly_savings match `margin_score_onnet_move` within 0.01 USD AND vendor_id matches exactly (`guard_mismatch()`). DRY_RUN evidence on 35360 (fn: vendor 00100000000264PAAA, 2513.61 / 2307.07, score 95): correct values -> would_insert tr-0737c00aebadddbcaa6feb3d958ae1c6; monthly_cost +100 -> refused 'monthly_cost mismatch' tr-de84f5d6f32bf88363a27505d225afb5; wrong vendor -> refused 'vendor_id mismatch' tr-f8381c2b386df41f0cdbcad54d779fb3. Commit: DEVOPS-COMMIT-ML-GUARD; md5 check: QA-VERIFY-ML-GUARD-MD5 (deadline 22:00 UTC Nov 15, DEC-060).
