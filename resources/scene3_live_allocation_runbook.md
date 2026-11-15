@@ -80,5 +80,7 @@ Presenter guard (DSN-SCENE3-MV-PREVIEW-GUARD, DEC-030/DEC-040): in Catalog Explo
 ## (c) MV depth - pending deployment
 Counts of comment, display_name, format and synonyms must be read from the DEPLOYED view, not from the YAML. Status 2026-11-12: 0 margin_ objects in cdm_tmforum._metrics. Suite MVs (offnet_spend, renewal_floor, segment_growth): not deployed. They are blocked on P2-MV-MARGIN-LEDGER, which waits on P1-LEDGER-GOLD-FASTPATH.
 
-## (d) Genie One object choice - pending
-Plan: certify margin_ledger_mv. Give the raw margin_ledger table a comment that says: use margin_ledger_mv for margin. Curate only the MVs in the Margin domain. Proposed Genie One workspace-instruction text goes in resources/ for CEO approval. Verify this with the generated SQL once the MV is deployed.
+## (d) Genie One object choice - RESOLVED (not an open item)
+Resolved 2026-11-15 by DEC-029b and DEC-054-FIN-ROUTING-RESOLVED. Gate 5 (Genie One capture) expired at Nov 14 18:00 UTC, so Genie One is descoped for the demo: only Margin Genie is used on stage, and the S1/S4 talk track makes no Genie One claim. DEC-054 records that the margin_ledger_mv UC comment rewrite already ranks margin_ledger_mv #1 for the Finance starter in search. This changes nothing on stage. No edit to the workspace instructions and no customerlake retag. Presenters: do not treat this section as pending.
+
+Superseded plan (history only): certify margin_ledger_mv; comment the raw margin_ledger table to point to margin_ledger_mv; curate only the MVs in the Margin domain; draft Genie One workspace-instruction text in resources/ for CEO approval.
