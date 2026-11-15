@@ -36,6 +36,13 @@ tr-7e87cf4df0dfdbf4a2ae39e1f1ab0478 - ask_margin_genie genie_basis=margin_genie,
 cdm_tmforum._metrics.margin_offnet_spend_mv WHERE is_grooming_candidate, total_row_count=47 (same 47 candidates as the
 scene-4 Ops answer: annual off-net cost 1,152,342.12, est. annual savings 412,539.96, DEC-026); dedup returned GROOM-44c3612b69 / GROOM-6d8f8ce31e, 0 new tickets.
 Ask Genie the exact scene-4 Ops question so it routes to the suite MV.
+
+STAGE GUARD (DEC-057 / ML-GENIE-TIMEOUT-DEADLINE, 2026-11-15):
+* Genie leg polls at most GENIE_TIMEOUT_S=25 s (was 120 s).
+* Hard Genie API error, or soft FAILED/CANCELLED/timeout/empty result -> falls back to GENIE_STANDIN_SQL with
+  genie_basis=sql_standin (span attr genie_fallback_reason). A sql_standin trace/ticket is NEVER described as a Genie answer.
+* RUN_DEADLINE_S=60 from run start is checked immediately before the approval queue write; if passed, the run
+  returns deadline_exceeded + would_insert and writes NOTHING (no late ticket). Stage rule stays: start once, never re-click.
 """
 import json, time, uuid
 import mlflow, psycopg
@@ -47,7 +54,10 @@ STUB_MODE = False
 DRY_RUN = True  # True = validate tickets but never INSERT into the app approval queue
 MARGIN_GENIE_SPACE_ID = "01f1df115a08164aab3ae5f6faac807c"  # Lakelink Fiber Margin Genie (P3-MARGIN-GENIE); None -> sql_standin
 WAREHOUSE_ID = "bf0baa637e887c80"
+GENIE_TIMEOUT_S = 25   # DEC-057: Genie poll cap (fits the 65 s stage cutoff)
+RUN_DEADLINE_S = 60    # DEC-057: no approval_tickets INSERT after this many seconds from run start
 _last_basis = {}
+_run_start = {"t": None}
 
 GENIE_FALLBACK_SQL = """
 WITH latest AS (SELECT circuit_id, paid_amount_usd, ROW_NUMBER() OVER (PARTITION BY circuit_id ORDER BY invoice_month DESC) rn
@@ -174,19 +184,38 @@ def ask_margin_genie(question):
         return {"genie_basis": "sql_standin",
                 "note": "Margin Genie space not yet available; answered with margin_score_onnet_move + MEASURE(contribution_margin) from margin_ledger_mv (top 10 of the DEC-017 candidates).",
                 "rows": run_sql(GENIE_STANDIN_SQL)}
-    _last_basis["genie_basis"] = "margin_genie"
-    out = genie_ask(question)
-    mlflow.get_current_active_span().set_attributes({
-        "genie_conversation_id": out["conversation_id"], "genie_message_id": out["message_id"],
-        "genie_total_row_count": str(out.get("total_row_count")), "genie_sql": out.get("sql") or ""})
-    return out
+    span = mlflow.get_current_active_span()
+    reason = None
+    try:  # DEC-057: the Genie leg never aborts the run
+        out = genie_ask(question)
+        span.set_attributes({
+            "genie_conversation_id": out["conversation_id"], "genie_message_id": out["message_id"],
+            "genie_status": str(out.get("status")),
+            "genie_total_row_count": str(out.get("total_row_count")), "genie_sql": out.get("sql") or ""})
+        if out.get("status") != "COMPLETED":
+            reason = f"soft:{out.get('status')}"
+        elif not out.get("rows"):
+            reason = "soft:empty_result"
+    except Exception as e:
+        reason = f"hard:{type(e).__name__}: {str(e)[:200]}"
+    if reason is None:
+        _last_basis["genie_basis"] = "margin_genie"
+        return out
+    _last_basis["genie_basis"] = "sql_standin"
+    span.set_attributes({"genie_fallback_reason": reason, "genie_basis": "sql_standin"})
+    mlflow.update_current_trace(tags={"genie_fallback": "sql_standin"})
+    return {"genie_basis": "sql_standin", "genie_fallback_reason": reason,
+            "note": "Margin Genie did not answer in time; answered with margin_score_onnet_move + MEASURE(contribution_margin) "
+                    "from margin_ledger_mv (SQL stand-in, not a Genie answer).",
+            "rows": run_sql(GENIE_STANDIN_SQL)}
 
 
-def genie_ask(question, timeout_s=120):
+def genie_ask(question, timeout_s=None):
     """Real Margin Genie via Genie Conversation API: start conversation, poll, fetch query result."""
     base = f"/api/2.0/genie/spaces/{MARGIN_GENIE_SPACE_ID}"
     m = w.api_client.do("POST", f"{base}/start-conversation", body={"content": question})
     cid, mid = m["conversation_id"], m["message_id"]
+    timeout_s = GENIE_TIMEOUT_S if timeout_s is None else timeout_s
     t0 = time.time()
     while True:
         msg = w.api_client.do("GET", f"{base}/conversations/{cid}/messages/{mid}")
@@ -258,6 +287,12 @@ def draft_savings_ticket(circuit_id, vendor_id, monthly_cost, est_monthly_saving
     if (INSERT_ALLOWLIST is not None and int(circuit_id) not in INSERT_ALLOWLIST) or len(_inserted) >= MAX_NEW_TICKETS:
         mlflow.get_current_active_span().set_attribute("insert_cap_block", True)
         return {"error": "run insert cap/allowlist: ticket not drafted this run", **extra}
+    elapsed = time.time() - (_run_start["t"] or time.time())
+    if elapsed > RUN_DEADLINE_S:  # DEC-057: no late ticket on stage
+        mlflow.get_current_active_span().set_attributes({"deadline_exceeded": True, "elapsed_s": round(elapsed, 1)})
+        return {"deadline_exceeded": True, "elapsed_s": round(elapsed, 1), "note": "run deadline passed; nothing written",
+                "would_insert": {"ticket_id": tid, "circuit_id": int(circuit_id), "vendor_id": vendor_id,
+                                 "monthly_cost": float(monthly_cost), "est_monthly_savings": float(est_monthly_savings), **extra}}
     if DRY_RUN:  # all guards passed; never write to the app queue in a dry run
         mlflow.get_current_active_span().set_attribute("dry_run", True)
         return {"dry_run": True, "would_insert": {"ticket_id": tid, "circuit_id": int(circuit_id), "vendor_id": vendor_id,
@@ -336,12 +371,15 @@ def cm_footer(ref):
 
 @mlflow.trace(name="lakelink_offnet_grooming_agent", span_type=SpanType.AGENT)
 def run_agent(task, max_turns=8):
+    _run_start["t"] = time.time()  # DEC-057 deadline clock
+    _last_basis.clear()
     mlflow.update_current_trace(tags={"telco_project": "margin_analysis", "company": "Lakelink Fiber",
                                       "stub_run": str(STUB_MODE).lower(), "dry_run": str(DRY_RUN).lower(),
                                       "genie_mode": "margin_genie" if MARGIN_GENIE_SPACE_ID else "sql_standin",
                                       "genie_space_id": str(MARGIN_GENIE_SPACE_ID),
                                       "identity_mode": "sp" if AGENT_SP_APP_ID else "user_fallback",
-                                      "run_as": w.current_user.me().user_name, "gateway_service": GATEWAY_SERVICE})
+                                      "run_as": w.current_user.me().user_name, "gateway_service": GATEWAY_SERVICE,
+                                      "genie_timeout_s": str(GENIE_TIMEOUT_S), "run_deadline_s": str(RUN_DEADLINE_S)})
     ref = margin_metric_view_reference()  # canonical CM + Ops figures from the metric views, logged in the trace
     messages = [{"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": task + "\n\nMetric view reference (copy, do not recompute): "
