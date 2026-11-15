@@ -10,7 +10,7 @@ Company: Lakelink Fiber (fictional). ONE Margin Genie for Finance, Ops, Sales, M
 
 ## Space title and description (DSN-GENIE-COPY-R1, DESIGN_TOKENS section 9)
 * Title: Lakelink Fiber Margin Genie
-* Description: "Ask Lakelink Fiber margin questions in plain English. One space for Finance, Ops, Sales, and Marketing. Margin always means contribution margin (revenue minus network expense minus cost to serve) from the governed metric view margin_ledger_mv, so every team gets the same number."
+* Description: "Ask Lakelink Fiber margin questions in plain English. One space for Finance, Ops, Sales, and Marketing. Margin always means contribution margin (revenue minus network expense minus cost to serve) from the governed metric view margin_ledger_mv, so every team gets the same number. The Margin domain in Discover curates the metric views, dashboard and app; Margin Genie is built on those same metric views and is linked from the dashboard and its description." (live 2026-11-15T18:18:55Z)
 * Sample questions, in order: Finance, Ops, Sales, Marketing (the plan starters, using "our own fiber").
 
 ## Verified answers 2026-11-13 (Genie conversation API vs independent raw SQL on margin_ledger_allocated)
