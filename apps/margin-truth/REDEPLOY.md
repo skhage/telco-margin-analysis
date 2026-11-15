@@ -33,10 +33,23 @@ The platform runs `npm install` and `npm run build` (server `tsc` + client `vite
 
 ## Verify after deploy (2 minutes)
 1. `databricks apps get lakelink-margin-truth`: `active_deployment.create_time` is later than the deploy command, and the status is RUNNING.
-2. Open the app URL and go to the Approval queue with Approver role = Ops. You should see 3 pending non-TEST tickets and no TEST-GROOM-4d4c099b0e (DEC-037a, DEC-038). GROOM-1e655052ef shows circuit 10211, vendor Partner Carrier 28, monthly cost $1,364.58, est. monthly savings $1,357.85 (the live approve target). GROOM-44c3612b69 shows circuit 45040, vendor Partner Carrier 55, $2,880.05, $879.34. GROOM-6d8f8ce31e shows circuit 98532, vendor Partner Carrier 47, $2,469.86, $469.00. Each row also shows the rationale under the title and a Comment (optional) field. The new build shows USD to the cent (DEC-030); whole dollars mean the old deployment 01f1df66 is still live.
+2. Open the app URL and go to the Approval queue with Approver role = Ops. You should see 3 pending non-TEST tickets and no TEST-GROOM-4d4c099b0e (DEC-037a, DEC-038). GROOM-1e655052ef shows circuit 10211, vendor Partner Carrier 28, monthly cost $1,364.58, est. monthly savings $1,357.85 (the live approve target). GROOM-44c3612b69 shows circuit 45040, vendor Partner Carrier 55, $2,880.05, $879.34. GROOM-6d8f8ce31e shows circuit 98532, vendor Partner Carrier 47, $2,469.86, $469.00. Each row also shows the rationale under the title and a Comment (optional) field. The new build shows USD to the cent (DEC-030); whole dollars mean the old deployment 01f1df66 is still live, unless you rolled back on purpose (see "If the new build misbehaves: roll back" below).
 3. Margin explorer, product_family, all quarters: the total contribution margin is 2,375,095,705.09 (DEC-020). Quarter 2026-07-01 is 590,767,062.41.
 4. The Margin Genie panel loads (the iframe shows the space, not a sign-in or 404 page).
 5. Scene 6: approve GROOM-1e655052ef (circuit 10211) in a rehearsal only (see SCENE5_CLICK_SCRIPT.md), then check the evidence panel shows `User identity (fallback): ran as stephen.hage@databricks.com`, trace `tr-2b088edfed85d22b2db662a6c0a7c68e` (DEC-037a), experiment `1235449331932066`, and 2 audit entries (Created, Approved).
+
+## If the new build misbehaves: roll back
+Run this one call (it restores the last known-good SUCCEEDED deployment 01f1df66):
+```
+POST /api/2.0/apps/lakelink-margin-truth/rollback
+{"deployment_id": "01f1df6665471f5ebf858b80eb08a2bd"}
+```
+Timing: time not yet measured; allow a few minutes before recording.
+
+Post-rollback verify:
+1. `databricks apps get lakelink-margin-truth`: status RUNNING, and a NEW `active_deployment` whose `rollback_of_deployment_id` is the redeploy id. A rollback creates a new deployment id, so do not expect 01f1df66 as the active id.
+2. Approval queue, Approver role = Ops: 3 pending non-TEST tickets 10211, 98532, 45040. Whole-dollar values are now EXPECTED: $1,365 / $1,358, $2,470 / $469, $2,880 / $879.
+3. Re-apply `SCENE5_CLICK_SCRIPT.md` pre-roll step 4: keep the Margin explorer tab off screen and quote CM from Margin Genie or the dashboard.
 
 ## Pre-checking the build without deploying (optional, serverless)
 Node via PyPI: `pip install nodejs-wheel-binaries`. The wheel's `bin/npm` wrapper is broken, so put a wrapper `/tmp/npmbin/npm` that runs `<site-packages>/nodejs_wheel/bin/node <site-packages>/nodejs_wheel/lib/node_modules/npm/bin/npm-cli.js "$@"` FIRST on PATH, because `npm run build` calls `npm` again for each step. Copy this folder to `/tmp`, then run `npm install && npm run typecheck && npm run build`. Last result: PASS on 2026-11-13 run #12 (dist/server/index.js, dist/client/index.html, assets 154.80 kB js / 4.47 kB css).
