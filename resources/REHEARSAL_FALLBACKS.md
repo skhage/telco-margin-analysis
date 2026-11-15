@@ -48,7 +48,7 @@ Hero circuit: **45040**, month **2026-10**. Every value below was read by SQL in
 | State | ticket_count weight | CM (MEASURE) | Cost to serve | Source |
 | --- | --- | --- | --- | --- |
 | Before (default) | 0.700000 | 2,375,095,705.09 | 360,273,982.31 | live query this run |
-| After change | 0.900000 | 2,360,713,702.39 (delta -14,382,002.70) | 374,655,985.01 | runbook b2 line 62 (SELECT-only simulation, existing evidence, not re-run) |
+| After change | 0.900000 | 2,360,713,702.39 (delta -14,382,002.70) | 374,655,985.01 | SELECT-only simulator src/data/margin_scene3_simulator.sql, re-run 2026-11-15 ~00:15 UTC (stmt 01f1e089-65dc-1e91-9d03-912932800f51) |
 | After revert | 0.700000 | 2,375,095,705.09, checksum 6ce4db5c... again | 360,273,982.31 | runbook b2 line 68 |
 
 **Fallback if the live change cannot run:** describe the change and show the before/after table above. Say "Finance raises the care-cost weight" (not pool-conserving: the care weights sum to 1.20, runbook line 76). Quote the exact CM only from Margin Genie or the dashboard (DEC-030/DEC-040). Never open the MV Sample Data preview (runbook line 78).
