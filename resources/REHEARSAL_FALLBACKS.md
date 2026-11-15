@@ -203,7 +203,7 @@ Do not claim on stage that a dedicated agent service principal made these calls.
 
 ---
 
-## S1/S4 - Margin Genie starter questions (owner @data-analyst, verified read-only 2026-11-14 ~21:00 UTC)
+## S1/S4 - Margin Genie starter questions (owner @data-analyst, verified read-only 2026-11-14 ~20:21 UTC, status_updates 626)
 
 Appended at the end on purpose so the S2/S3/S6/S7 line refs in CEO_ACTION_SHEET stay valid (agent_notes 1890). No Genie space, MV or dashboard edit (DEC-046a, DEC-036).
 
