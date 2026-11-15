@@ -369,6 +369,22 @@ def cm_footer(ref):
             f"{ref.get('metric_view_cm')}, statement {ref.get('cm_statement_id')}): USD {float(v):,.2f}")
 
 
+# BASIS LABEL (ML-F-STANDIN-SUMMARY-LABEL / COO-Q-20261115-39, 2026-11-15): DEC-057(3) says a sql_standin answer is never
+# described as a Genie answer. The LLM once headed a stand-in answer 'Margin Genie Results' (tr-2bdc2992), so when the
+# run's genie_basis is sql_standin the final text is relabelled deterministically (no LLM involved) and gets a basis line.
+# Normal path (genie_basis=margin_genie) is returned unchanged.
+STANDIN_LABEL = "SQL stand-in (Margin Genie did not answer in time)"
+
+
+def basis_label(text):
+    if _last_basis.get("genie_basis") != "sql_standin":
+        return text
+    import re
+    text = re.sub(r"Margin Genie (Results|Answer|Findings|Output|Response)s?", STANDIN_LABEL + " results", text,
+                  flags=re.IGNORECASE)
+    return f"Basis: {STANDIN_LABEL}. This is not a Margin Genie answer.\n\n" + text
+
+
 @mlflow.trace(name="lakelink_offnet_grooming_agent", span_type=SpanType.AGENT)
 def run_agent(task, max_turns=8):
     _run_start["t"] = time.time()  # DEC-057 deadline clock
@@ -390,7 +406,8 @@ def run_agent(task, max_turns=8):
         messages.append({k: v for k, v in msg.items() if k in ("role", "content", "tool_calls")})
         tcs = msg.get("tool_calls") or []
         if not tcs:
-            return {"final": (msg.get("content") or "") + cm_footer(ref), "tool_calls": calls,
+            return {"final": basis_label(msg.get("content") or "") + cm_footer(ref), "tool_calls": calls,
+                    "genie_basis": _last_basis.get("genie_basis"),
                     "portfolio_contribution_margin_usd": ref.get("portfolio_contribution_margin_usd"),
                     "cm_statement_id": ref.get("cm_statement_id")}
         for tc in tcs:

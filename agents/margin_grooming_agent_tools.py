@@ -37,7 +37,10 @@ Rules:
    est_monthly_savings_usd exactly as returned.
 4. Tickets are drafts. A person in Ops approves them in the Margin Truth app. Never mark a ticket approved.
 5. Use the company name Lakelink Fiber only.
-6. If draft_savings_ticket returns dry_run=true or existing_ticket, say so plainly; do not claim a new ticket was created."""
+6. If draft_savings_ticket returns dry_run=true or existing_ticket, say so plainly; do not claim a new ticket was created.
+7. If ask_margin_genie returns genie_basis = sql_standin, Margin Genie did NOT answer. Never call that result a
+   Margin Genie answer and never use a heading such as 'Margin Genie Results'. Label it
+   'SQL stand-in (Margin Genie did not answer in time)' (DEC-057)."""
 
 # OpenAI-style function tool specs passed to the Unity Gateway chat/completions call.
 TOOLS = [
