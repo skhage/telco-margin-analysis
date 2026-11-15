@@ -7,8 +7,8 @@ Surfaces and how each is called:
   1. metric_view - SQL Statement API: MEASURE(contribution_margin) FROM cdm_tmforum._metrics.margin_ledger_mv
   2. genie       - Genie Conversation API (POST /api/2.0/genie/spaces/{space_id}/start-conversation), read the
                    query_result attachment. Needs MARGIN_GENIE_SPACE_ID (P3-MARGIN-GENIE).
-  3. genie_one   - Same Conversation API path is not available for Genie One; check is manual: ask the Finance
-                   question in Genie One and paste the per-family values into GENIE_ONE_MANUAL below.
+  3. genie_one   - SKIPPED per DEC-029b (gate 5 expired Nov 14 18:05 UTC; Margin Genie only on stage, no Genie One
+                   claim). No Genie One API exists; the check reports SKIPPED, not PASS.
   4. dashboard   - Lakeview: run the dashboard dataset SQL (GET /api/2.0/lakeview/dashboards/{id}, dataset queryLines)
                    through the SQL Statement API. Needs MARGIN_DASHBOARD_ID (P3-DASHBOARD).
   5. app         - GET {app_url}/api/explorer?group_by=product_family (apps/margin-truth). Needs the redeployed app.
@@ -139,7 +139,7 @@ def run(spark):
         "metric_view": compare("mv", sql_surface(spark, MV_SQL), tol=ALLOC_TOL_CELL),
         "ledger_allocated": compare("alloc", sql_surface(spark, ALLOC_SQL), tol=ALLOC_TOL_CELL),
         "genie": compare("genie", None),       # wire after P3-MARGIN-GENIE
-        "genie_one": compare("genie_one", GENIE_ONE_MANUAL or None),
+        "genie_one": ("SKIPPED", ["DEC-029b: Genie One not a stage surface"]),
         "dashboard": compare("dashboard", None),  # wire after P3-DASHBOARD
         "app": compare("app", None),           # wire after app redeploy
         "agent": compare("agent", None),       # wire after P4-GROOMING-AGENT
