@@ -11,7 +11,7 @@ See `resources/CEO_ACTION_SHEET.md` gate 1 for the exact statements. The app cod
 * `public.approval_audit_audit_id_seq`: USAGE (audit insert)
 * Optional (DSN-SCENE5-R1 vendor names): UC SELECT on `cdm_tmforum.revenue_assurance.margin_vendors` for the app SP. Without it the Vendor column shows only the raw ID, and nothing else breaks.
 
-On 2026-11-13 (app-developer run #11) the SP role exists but has no SELECT/UPDATE/INSERT on either table.
+As of 2026-11-15 21:28 UTC (app-developer run R69, read-only `has_table_privilege` check), the SP role has USAGE on schema `public` but no SELECT/INSERT/UPDATE on either table. Gate 1 is still open.
 
 ## Owner, cutoff, confirmation (COO-Q-20261114-18)
 * Who runs it: the CEO, stephen.hage@databricks.com (the only human and the app owner, DEC-025 / DEC-036c). Agents cannot deploy from scheduled runs (Auto Mode).
@@ -26,7 +26,7 @@ databricks apps deploy lakelink-margin-truth --source-code-path /Workspace/Users
 The platform runs `npm install` and `npm run build` (server `tsc` + client `vite build`), then starts `node dist/server/index.js` per `app.yaml`. Do not commit `node_modules/` or `dist/` to this folder.
 
 ## What the new deployment picks up
-* `GENIE_SPACE_ID=01f1df115a08164aab3ae5f6faac807c` (Margin Genie iframe). The live deployment from 2026-11-12T23:29Z predates this value.
+* `GENIE_SPACE_ID=01f1df115a08164aab3ae5f6faac807c` (Margin Genie iframe). The live deployment 01f1df6665471f5ebf858b80eb08a2bd (created 2026-11-13T13:30:30Z) already embeds this space, but shows USD in whole dollars (0 dp).
 * `SHOW_TEST_TICKETS=false`: `TEST-*` tickets are hidden from the queue, decisions, and evidence. Rows are not deleted.
 * `MARGIN_MV=cdm_tmforum._metrics.margin_ledger_mv`, `MLFLOW_EXPERIMENT_ID=1235449331932066`.
 * Scene 6 evidence panel (APP-TRACE-VIEW-PREBUILD, 2026-11-13): after Approve (or View evidence) the panel lists the agent, the service principal (or `User identity (fallback): ran as <user>` when `agent_sp_*` is NULL, per ML-GROOMING-FALLBACK-PATH), the MLflow trace link + id, the experiment id, the decision, and every `approval_audit` row with a details column.
@@ -34,7 +34,7 @@ The platform runs `npm install` and `npm run build` (server `tsc` + client `vite
 ## Verify after deploy (2 minutes)
 1. `databricks apps get lakelink-margin-truth`: `active_deployment.create_time` is later than the deploy command, and the status is RUNNING.
 2. Open the app URL and go to the Approval queue with Approver role = Ops. You should see 3 pending non-TEST tickets and no TEST-GROOM-4d4c099b0e (DEC-037a, DEC-038). GROOM-1e655052ef shows circuit 10211, vendor Partner Carrier 28, monthly cost $1,364.58, est. monthly savings $1,357.85 (the live approve target). GROOM-44c3612b69 shows circuit 45040, vendor Partner Carrier 55, $2,880.05, $879.34. GROOM-6d8f8ce31e shows circuit 98532, vendor Partner Carrier 47, $2,469.86, $469.00. Each row also shows the rationale under the title and a Comment (optional) field. The new build shows USD to the cent (DEC-030); whole dollars mean the old deployment 01f1df66 is still live, unless you rolled back on purpose (see "If the new build misbehaves: roll back" below).
-3. Margin explorer, product_family, all quarters: the total contribution margin is 2,375,095,705.09 (DEC-020). Quarter 2026-07-01 is 590,767,062.41.
+3. Margin explorer, product_family, all quarters: the total contribution margin is $2,375,095,705.09 (DEC-020). Quarter 2026-07-01 is $590,767,062.41.
 4. The Margin Genie panel loads (the iframe shows the space, not a sign-in or 404 page).
 5. Scene 6: approve GROOM-1e655052ef (circuit 10211) in a rehearsal only (see SCENE5_CLICK_SCRIPT.md), then check the evidence panel shows `User identity (fallback): ran as stephen.hage@databricks.com`, trace `tr-2b088edfed85d22b2db662a6c0a7c68e` (DEC-037a), experiment `1235449331932066`, and 2 audit entries (Created, Approved).
 
