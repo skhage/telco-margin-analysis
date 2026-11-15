@@ -77,8 +77,14 @@ Note for the talk track: this change does not conserve the pool. The customer_ca
 
 Presenter guard (DSN-SCENE3-MV-PREVIEW-GUARD, DEC-030/DEC-040): in Catalog Explorer, open `margin_ledger_mv` on the Overview / definition (YAML source and measure list) only. Do NOT open the Sample Data preview: the MV default format shows CM as a compact 0 dp value, which differs from DEC-030. Quote the exact CM to the cent only from Margin Genie or the dashboard.
 
-## (c) MV depth - pending deployment
-Counts of comment, display_name, format and synonyms must be read from the DEPLOYED view, not from the YAML. Status 2026-11-12: 0 margin_ objects in cdm_tmforum._metrics. Suite MVs (offnet_spend, renewal_floor, segment_growth): not deployed. They are blocked on P2-MV-MARGIN-LEDGER, which waits on P1-LEDGER-GOLD-FASTPATH.
+## (c) MV depth - RESOLVED (not an open item)
+Resolved 2026-11-15 (DE-F-S3-RUNBOOK-MV-DEPTH-STALE) per DEC-035 as corrected by DEC-041(a). The 2026-11-12 status (0 margin_ objects in cdm_tmforum._metrics) is out of date. Counts are read from the DEPLOYED views (DESCRIBE TABLE EXTENDED ... AS JSON, view_text), not from the YAML. Re-verified 2026-11-15:
+
+* 5 margin_ metric views deployed in cdm_tmforum._metrics, all YAML v1.1 (frozen, DEC-028/DEC-036): margin_ledger_mv (14 dims + 11 measures), margin_offnet_spend_mv (12 + 7), margin_onebillion_wall_mv (4 + 5), margin_renewal_floor_mv (15 + 7), margin_segment_growth_mv (3 + 7).
+* 85 fields in total. comment 85/85, display_name 85/85, synonyms 85/85, format 47/85.
+* The 38 fields without a format are all dimensions (STRING, BOOLEAN or BIGINT ID columns), where a format adds nothing. All measures have a format. contribution_margin uses currency USD compact 0 dp, and that is presentation-only under DEC-030 (see the presenter guard above).
+
+The scene 3 presenter line from DEC-035 stays as it is: no claim about synonyms or formats on the MV. Dimension formats move to YAML v1.2 after Nov 19 (DP-POST-DEMO-MV-COMMENT-DEPTH).
 
 ## (d) Genie One object choice - RESOLVED (not an open item)
 Resolved 2026-11-15 by DEC-029b and DEC-054-FIN-ROUTING-RESOLVED. Gate 5 (Genie One capture) expired at Nov 14 18:00 UTC, so Genie One is descoped for the demo: only Margin Genie is used on stage, and the S1/S4 talk track makes no Genie One claim. DEC-054 records that the margin_ledger_mv UC comment rewrite already ranks margin_ledger_mv #1 for the Finance starter in search. This changes nothing on stage. No edit to the workspace instructions and no customerlake retag. Presenters: do not treat this section as pending.
