@@ -529,21 +529,21 @@
         "  FROM cdm_tmforum._metrics.margin_ledger_mv)\n",
         "SELECT 1 AS card_no, 'Legacy losses' AS card, 'Finance' AS persona,\n",
         "  'Which product families lost money after cost to serve last quarter?' AS genie_question,\n",
-        "  CONCAT('Q3 2026: ', ARRAY_JOIN(ARRAY_SORT(COLLECT_LIST(CONCAT(product_family, ' ', FORMAT_NUMBER(CAST(cm AS DECIMAL(38,2)), 2)))), '; ')) AS expected_answer,\n",
+        "  CONCAT('Q3 2026: ', ARRAY_JOIN(ARRAY_SORT(COLLECT_LIST(CONCAT(product_family, ' ', CASE WHEN cm < 0 THEN '-$' ELSE '$' END, FORMAT_NUMBER(CAST(ABS(cm) AS DECIMAL(38,2)), 2)))), '; ')) AS expected_answer,\n",
         "  'margin_ledger_mv' AS source_metric_view FROM fin\n",
         "UNION ALL SELECT 2, 'Off-net grooming', 'Ops', 'Which off-net circuits run next to our own fiber, and what do we pay for them?',\n",
-        "  CONCAT(FORMAT_NUMBER(cand, 0), ' grooming candidates; annual off-net cost (what we pay) ', FORMAT_NUMBER(CAST(annual_cost AS DECIMAL(38,2)), 2), '; est. annual savings if moved on-net ', FORMAT_NUMBER(CAST(annual_savings AS DECIMAL(38,2)), 2)),\n",
+        "  CONCAT(FORMAT_NUMBER(cand, 0), ' grooming candidates; annual off-net cost (what we pay) ', CASE WHEN annual_cost < 0 THEN '-$' ELSE '$' END, FORMAT_NUMBER(CAST(ABS(annual_cost) AS DECIMAL(38,2)), 2), '; est. annual savings if moved on-net ', CASE WHEN annual_savings < 0 THEN '-$' ELSE '$' END, FORMAT_NUMBER(CAST(ABS(annual_savings) AS DECIMAL(38,2)), 2)),\n",
         "  'margin_offnet_spend_mv' FROM ops\n",
         "UNION ALL SELECT 3, 'Renewals below the margin floor', 'Sales', 'Which renewals in the next 90 days are below the margin floor?',\n",
-        "  CONCAT(FORMAT_NUMBER(below_floor, 0), ' of ', FORMAT_NUMBER(renewals, 0), ' renewals (with ledger activity) below floor; revenue at stake ', FORMAT_NUMBER(CAST(bf_revenue AS DECIMAL(38,2)), 2)),\n",
+        "  CONCAT(FORMAT_NUMBER(below_floor, 0), ' of ', FORMAT_NUMBER(renewals, 0), ' renewals (with ledger activity) below floor; revenue at stake ', CASE WHEN bf_revenue < 0 THEN '-$' ELSE '$' END, FORMAT_NUMBER(CAST(ABS(bf_revenue) AS DECIMAL(38,2)), 2)),\n",
         "  'margin_renewal_floor_mv' FROM sal\n",
         "UNION ALL SELECT 4, 'Room to grow', 'Marketing', 'Which segments have the highest margin and the most room to grow?',\n",
         "  CONCAT(segment, ': CM ', FORMAT_NUMBER(CAST(cm_pct * 100 AS DECIMAL(38,1)), 1), '% vs portfolio ', FORMAT_NUMBER(CAST(portfolio_cm_pct * 100 AS DECIMAL(38,1)), 1), '%, revenue share below customer share'),\n",
         "  'margin_segment_growth_mv' FROM mkt\n",
         "UNION ALL SELECT 5, 'Revenue Leakage', 'Finance', 'How much Revenue Leakage is there to recover?',\n",
-        "  CONCAT('Revenue Leakage ', FORMAT_NUMBER(CAST(leakage AS DECIMAL(38,2)), 2)), 'margin_ledger_mv' FROM led\n",
+        "  CONCAT('Revenue Leakage ', CASE WHEN leakage < 0 THEN '-$' ELSE '$' END, FORMAT_NUMBER(CAST(ABS(leakage) AS DECIMAL(38,2)), 2)), 'margin_ledger_mv' FROM led\n",
         "UNION ALL SELECT 6, 'Carrier Rate Variance', 'Ops', 'How much Carrier Rate Variance did carriers bill us above the contract rate?',\n",
-        "  CONCAT('Carrier Rate Variance ', FORMAT_NUMBER(CAST(rate_variance AS DECIMAL(38,2)), 2)), 'margin_ledger_mv' FROM led\n",
+        "  CONCAT('Carrier Rate Variance ', CASE WHEN rate_variance < 0 THEN '-$' ELSE '$' END, FORMAT_NUMBER(CAST(ABS(rate_variance) AS DECIMAL(38,2)), 2)), 'margin_ledger_mv' FROM led\n",
         "ORDER BY card_no\n"
       ]
     }
@@ -1520,7 +1520,7 @@
                   }
                 },
                 "label": {
-                  "show": true
+                  "show": false
                 }
               },
               "frame": {
@@ -1617,7 +1617,7 @@
               },
               "frame": {
                 "showTitle": true,
-                "title": "Which product families lose money after cost to serve?",
+                "title": "Contribution margin by product family (use the Quarter filter; Q3 2026 = last quarter)",
                 "showDescription": true,
                 "description": "Source: margin_ledger_mv, Contribution Margin by product_family. Losses first; signed labels; Loss/Profit legend is text."
               }
@@ -1852,7 +1852,7 @@
                   },
                   {
                     "fieldName": "vendor_id",
-                    "displayName": "Vendor"
+                    "displayName": "Vendor ID"
                   },
                   {
                     "fieldName": "contribution_margin",
@@ -1964,7 +1964,7 @@
             "x": 0,
             "y": 21,
             "width": 6,
-            "height": 8
+            "height": 2
           }
         }
       ],
@@ -2374,7 +2374,7 @@
             "x": 0,
             "y": 18,
             "width": 6,
-            "height": 8
+            "height": 2
           }
         },
         {
@@ -2573,7 +2573,7 @@
                 "\n",
                 "\"Which product families lost money after cost to serve last quarter?\"\n",
                 "\n",
-                "Check: Answer key row 1, and Page 1 'Which product families lose money after cost to serve?' (Quarter = Q3 2026)\n"
+                "Check: Answer key row 1, and Page 1 'Contribution margin by product family (use the Quarter filter; Q3 2026 = last quarter)' (Quarter = Q3 2026)\n"
               ]
             }
           },
@@ -2705,7 +2705,7 @@
             "x": 0,
             "y": 13,
             "width": 6,
-            "height": 8
+            "height": 2
           }
         },
         {
@@ -2769,7 +2769,7 @@
                   },
                   {
                     "fieldName": "expected_answer",
-                    "displayName": "Expected answer (USD, 2 dp)"
+                    "displayName": "Expected answer"
                   },
                   {
                     "fieldName": "source_metric_view",
@@ -2781,7 +2781,7 @@
                 "showTitle": true,
                 "title": "Challenge card answer key",
                 "showDescription": true,
-                "description": "Live MEASURE() values from margin_ledger_mv, margin_offnet_spend_mv, margin_renewal_floor_mv, margin_segment_growth_mv. Updates when an allocation rule changes."
+                "description": "Live MEASURE() values from margin_ledger_mv, margin_offnet_spend_mv, margin_renewal_floor_mv, margin_segment_growth_mv. Updates when an allocation rule changes. USD to 2 dp; counts whole; % to 1 dp."
               }
             }
           },
