@@ -36,6 +36,13 @@ Hero circuit: **45040**, month **2026-10**. Every value below was read by SQL in
 
 **Talk-track caveat:** the cash hop is customer level only. Do not claim that cash is traced to this circuit or to this month.
 
+**Scene-2 lineage click path (DE-S2-LINEAGE-CLICKPATH, read-only via system.access.table_lineage 2026-11-15 ~06:15 UTC; Catalog Explorer UI not readable in a scheduled run):**
+
+* Do NOT start the lineage click from `margin_ledger`. It is a MANAGED table written only by notebooks (no pipeline node), and the live view stopped reading it after 2026-11-13.
+* Start at `_metrics.margin_ledger_mv` (or the Genie answer). Its YAML source is `revenue_assurance.margin_ledger_allocated` (VIEW). Open that view's Lineage tab and click the upstream hop **margin_ledger_allocated -> margin_ledger_v2**. `margin_ledger_v2` is a MATERIALIZED_VIEW, and its upstream graph shows the pipeline node **20960984** ("Lakelink Fiber Margin Truth Pipeline").
+* From `margin_ledger_v2`, go upstream: margin_silver_invoice_parsed -> margin_bronze_invoice_docs (STREAMING_TABLE, pipeline 20960984). Bronze has no table-level edge from the volume, so open the bronze `path` column (20/20 rows are in `/Volumes/cdm_tmforum/revenue_assurance/margin_documents/`) and open the PDF in the volume browser.
+* Stale pipeline ccea7e91 has 0 lineage edges to or from any margin_ table in the last 30 days. Only 20960984 appears.
+
 ---
 
 ## S3 - Why the number is trusted (owner @data-engineer; live UPDATE is human-only, NOT run by agents)
@@ -299,3 +306,16 @@ Warehouse bf0baa637e887c80. Statement ids are real execution ids, not header tim
 * Tie-out: the 5 regions sum to 2,375,095,705.09 and 517,032 rows (stmt 01f1e078-a7c8-1472-873b-928118610bd5).
 
 **Fallback (no live Sales identity on stage):** Show the DESCRIBE row filter line, then read: "A West Sales rep sees 103,176 ledger rows and 476.6M of contribution margin, which is only their accounts. Finance sees the full 2.375B. It is the same metric view with one governed filter." Do not log in as a synthetic rep, because the lakelinkfiber.example principals are not workspace users.
+
+## S5-CUE - Live grooming run: pre-start cue and 65s cutoff (owner @app-developer, from COO-Q-20261115-22 / -24, written 2026-11-15 ~06:40 UTC)
+
+Appended at the end so earlier line refs stay valid. This section is the presenter copy of the cue. `apps/margin-truth/SCENE5_CLICK_SCRIPT.md` is NOT edited (notes 1805/2182, DEC-055(2)); its md5 stays 2d21dedc3522. The click script describes the pre-run path (3 pending tickets). This section adds the optional live run in front of it.
+
+1. **Pre-start (when the scene-4 Marketing question is asked, about 60s before scene 5 opens):** the operator starts ONE live grooming run: `agents/margin_grooming_agent.py`, DRY_RUN=False, circuit allowlist {35360}, cap 1. Start it exactly once. Never click run again: there is no concurrent-run duplicate guard on approval_tickets (agent_notes 2257, COO-Q-20261115-24(3)).
+2. **Cutoff 65s after start:** open Approval queue -> role Ops -> Pending. If a new pending ticket for circuit 35360 is at the top (newest first), say "The agent drafted this one while we were talking," and show it. The approve click target stays GROOM-1e655052ef (10211), because scene 6 Trace A is tr-2b088edf (DEC-037, DEC-044). If @pm decides otherwise, this line changes.
+3. **No 35360 ticket at 65s:** say "Here is one the agent drafted earlier," and go straight to the pre-run ticket GROOM-1e655052ef (10211). Then follow SCENE5_CLICK_SCRIPT.md steps 2-5 as written (3 pending tickets on screen).
+4. **Late ticket:** if the 35360 ticket lands after you switched, do not approve it on stage. Point to it in scene 6 as "the run we started earlier, with its own trace."
+5. **Why 65s:** 9 traces in 48h (agent_notes 2214): wall p50 55.6s / p95 70.8s; ticket insert p50 43.7s / p95 58.4s / max 60.6s; 0/9 sql_fallback. The Genie poll timeout in the agent is still 120s (proposed 25s, PM-DEC-GENIE-TIMEOUT-65S open). A failed Genie leg falls back to `sql_standin` and can finish after 65s. The cutoff stays 65s in every case.
+6. **After a rehearsal take with the live run:** the 35360 ticket stays pending. Reject or approve it in the app before the next take, or ask @ml-engineer to re-draft, so the on-screen queue matches the click script again.
+
+Queue state checked read-only before writing this section (app Lakebase ep-calm-king-d2mq878u, 2026-11-15 ~06:35 UTC): pending GROOM-1e655052ef 10211 1,364.58/1,357.85; GROOM-6d8f8ce31e 98532 2,469.86/469.00; GROOM-44c3612b69 45040 2,880.05/879.34; plus TEST-GROOM-4d4c099b0e (hidden, DEC-038). No 35360 ticket. approval_audit 4 rows, max audit_id 6.
