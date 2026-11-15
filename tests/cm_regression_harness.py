@@ -37,8 +37,55 @@ EXPECTED_PERSONA = {
     "ops_hero_circuit_count": 47,  # DEC-017: off-net AND parallel AND margin_score_onnet_move savings > 0 (featured 45040, 98532)
     "ops_hero_band_subview": 12,    # @qa band filter (note 206), sub-view only
     "marketing_room_to_grow": ["Commercial"],
-    "sales_below_floor_renewals": None,  # PENDING demo as-of date (DEC-017 does not pin it): @qa 2026-11-13 got 603 @ as-of 2026-11-13, 586 @ 2026-11-19
+    "sales_below_floor_renewals": 586,  # as-of 2026-11-19 (DEC-019), window inclusive [2026-11-19, +90d]; 603 if as-of 2026-11-13
 }
+
+# Scene 7: $1B Wall challenge cards (QA-SCENE7-CARDS-HARNESS, @qa 2026-11-15). Raw SQL = section (7) of
+# tests/cm_baseline_expected.sql; MV check = margin_onebillion_wall_mv MEASURE(identified_savings) by lever.
+EXPECTED_SCENE7 = {
+    "legacy_repricing": Decimal("27609396.70"),
+    "revenue_leakage": Decimal("26698861.46"),
+    "renewal_floor_gap": Decimal("4837761.36"),
+    "carrier_rate_variance": Decimal("1694614.90"),
+    "offnet_grooming_savings": Decimal("412539.96"),
+    "wall_identified_total": Decimal("61253174.38"),
+    "c1_ip_vpn_q3_cm": Decimal("-6715475.88"),
+    "c1_legacy_voice_q3_cm": Decimal("-249532.74"),
+    "c1_loser_families": Decimal("2"),
+    "c2_grooming_circuits": Decimal("47"),
+    "c2_annual_offnet_cost": Decimal("1152342.12"),
+    "c3_renewals": Decimal("1490"),
+    "c3_below_floor": Decimal("586"),
+    "c3_revenue_at_stake": Decimal("18890869.75"),
+}
+EXPECTED_WALL_MV = {
+    "Legacy repricing": Decimal("27609396.70"),
+    "Revenue leakage recovery": Decimal("26698861.46"),
+    "Renewal margin floor": Decimal("4837761.36"),
+    "Carrier rate variance recovery": Decimal("1694614.90"),
+    "Off-net grooming": Decimal("412539.96"),
+}
+WALL_MV_SQL = ("SELECT lever, CAST(MEASURE(identified_savings) AS DECIMAL(18,2)) AS v "
+               "FROM cdm_tmforum._metrics.margin_onebillion_wall_mv GROUP BY ALL")
+BASELINE_SQL_PATH = "/Workspace/Users/stephen.hage@databricks.com/telco-margin-analysis/tests/cm_baseline_expected.sql"
+
+
+def scene7_raw_sql(path=BASELINE_SQL_PATH):
+    """Return statement (7) (the last statement) of cm_baseline_expected.sql with comment lines removed."""
+    with open(path) as f:
+        text = f.read()
+    # Drop comment lines BEFORE splitting: comments in section (7) contain ';'.
+    code = "\n".join(l for l in text.splitlines() if not l.strip().startswith("--"))
+    stmts = [s.strip() for s in code.split(";")]
+    return [s for s in stmts if s][-1]
+
+
+def run_scene7(spark):
+    """Scene 7 cards + Wall: raw SQL and the Wall MV must both match to the cent."""
+    return {
+        "scene7_raw": compare("scene7_raw", sql_surface(spark, scene7_raw_sql()), expected=EXPECTED_SCENE7),
+        "scene7_wall_mv": compare("scene7_wall_mv", sql_surface(spark, WALL_MV_SQL), expected=EXPECTED_WALL_MV),
+    }
 
 GENIE_ONE_MANUAL = {}  # fill by hand during rehearsal
 
@@ -88,7 +135,8 @@ def dry_run():
 def run(spark):
     results = {
         "reference_raw_sql": compare("ref", sql_surface(spark, REF_SQL)),
-        "metric_view": compare("mv", sql_surface(spark, MV_SQL)),
+        # MV sources margin_ledger_allocated (per-row ROUND, total 2375095705.09), not margin_ledger: use the alloc tolerance.
+        "metric_view": compare("mv", sql_surface(spark, MV_SQL), tol=ALLOC_TOL_CELL),
         "ledger_allocated": compare("alloc", sql_surface(spark, ALLOC_SQL), tol=ALLOC_TOL_CELL),
         "genie": compare("genie", None),       # wire after P3-MARGIN-GENIE
         "genie_one": compare("genie_one", GENIE_ONE_MANUAL or None),
@@ -102,6 +150,8 @@ def run(spark):
     if alloc is not None:
         at = sum(alloc.values())
         results["ledger_allocated_total"] = ("PASS" if abs(at - EXPECTED_ALLOC_TOTAL) <= ALLOC_TOL_TOTAL else "MISMATCH", [("__TOTAL__", EXPECTED_ALLOC_TOTAL, at)])
+    assert sum(EXPECTED_WALL_MV.values()) == EXPECTED_SCENE7["wall_identified_total"]
+    results.update(run_scene7(spark))
     return results
 
 

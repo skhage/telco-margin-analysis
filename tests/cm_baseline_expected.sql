@@ -84,3 +84,55 @@ m AS (SELECT contract_id, SUM(revenue_usd - network_expense_usd - cost_to_serve_
 SELECT COUNT(*) AS renewals, COUNT(m.contract_id) AS with_ledger,
        SUM(CASE WHEN m.cm_pct < r.margin_floor_pct THEN 1 ELSE 0 END) AS below_floor
 FROM r LEFT JOIN m USING (contract_id);
+
+-- (7) Scene 7: $1B Wall challenge cards (QA-SCENE7-CARDS-HARNESS, added @qa 2026-11-15 ~15:45 UTC).
+--     Raw SQL on margin_ledger_allocated (the MV source), independent of the metric views. As-of DATE'2026-11-19' (DEC-019).
+--     Verified 2026-11-15: raw = margin_onebillion_wall_mv MEASURE = Margin Genie 01f1df11 (DA-SCENE7-CARDS-GENIE-RUN-1115).
+--     Expected:
+--     C1 Finance  legacy losses Q3 2026: IP-VPN -6715475.88, Legacy Voice -249532.74 (only 2 families < 0)
+--     C2 Ops      off-net grooming: 172 parallel off-net circuits, 47 with savings > 0, annual cost 1152342.12, annual savings 412539.96
+--                 (ROUND monthly to 2 dp, then x12; unrounded savings would be 412539.85)
+--     C3 Sales    renewals [2026-11-19, +90d]: 1490 renewals, 1377 with ledger rows, 586 below floor, revenue at stake 18890869.75, floor gap 4837761.36
+--     C4 Mktg     room to grow: Commercial only (cm_pct 0.5435 > 0.5414; revenue share 0.3443 < customer share 0.3446)
+--     C5 Finance  revenue leakage: 26698861.46
+--     C6 Ops      carrier rate variance: 1694614.90
+--     WALL        identified 61253174.38 = legacy repricing 27609396.70 + leakage 26698861.46 + renewal floor 4837761.36
+--                 + rate variance 1694614.90 + off-net grooming 412539.96; target 1000000000.00, gap 938746825.62
+--     NOTE legacy repricing = -SUM of negative legacy-family CM at PRODUCT grain (27609396.70); contract/circuit grain gives 28765541.75.
+WITH q3 AS (
+  SELECT product_family, SUM(revenue_usd - network_expense_usd - cost_to_serve_usd) AS cm
+  FROM cdm_tmforum.revenue_assurance.margin_ledger_allocated
+  WHERE ledger_month >= DATE'2026-07-01' AND ledger_month < DATE'2026-10-01' GROUP BY product_family),
+groom AS (
+  SELECT i.circuit_id, MAX_BY(i.paid_amount_usd, i.invoice_month) AS paid, MAX(c.bandwidth_mbps) AS bw, MAX(c.onnet_distance_m) AS d
+  FROM cdm_tmforum.revenue_assurance.margin_carrier_invoices i
+  JOIN cdm_tmforum.revenue_assurance.margin_circuits c ON i.circuit_id = c.circuit_id
+  WHERE NOT c.is_on_net AND c.is_parallel_to_onnet_fiber GROUP BY i.circuit_id),
+gs AS (SELECT ROUND(paid, 2) AS paid, ROUND(paid - (2 * bw + 0.5 * d / 36), 2) AS sav FROM groom),
+ren AS (
+  SELECT c.contract_id AS rid, p.margin_floor_pct AS f
+  FROM cdm_tmforum.revenue_assurance.margin_contracts c
+  JOIN cdm_tmforum.revenue_assurance.margin_products p ON c.product_id = p.product_id
+  WHERE c.term_end BETWEEN DATE'2026-11-19' AND date_add(DATE'2026-11-19', 90)),
+led AS (
+  SELECT contract_id AS mid, SUM(revenue_usd) AS rev, SUM(revenue_usd - network_expense_usd - cost_to_serve_usd) AS cm
+  FROM cdm_tmforum.revenue_assurance.margin_ledger_allocated GROUP BY contract_id),
+legacy AS (
+  SELECT product_id, SUM(revenue_usd - network_expense_usd - cost_to_serve_usd) AS cm
+  FROM cdm_tmforum.revenue_assurance.margin_ledger_allocated WHERE family_class = 'legacy' GROUP BY product_id),
+lev AS (
+  SELECT 'legacy_repricing' AS check_name, CAST(-SUM(cm) AS DECIMAL(18,2)) AS v FROM legacy WHERE cm < 0
+  UNION ALL SELECT 'revenue_leakage', CAST(SUM(expected_revenue_usd) - SUM(revenue_usd) AS DECIMAL(18,2)) FROM cdm_tmforum.revenue_assurance.margin_ledger_allocated
+  UNION ALL SELECT 'renewal_floor_gap', CAST(SUM(CASE WHEN l.cm / l.rev < r.f THEN (r.f - l.cm / l.rev) * l.rev END) AS DECIMAL(18,2)) FROM ren r LEFT JOIN led l ON r.rid = l.mid
+  UNION ALL SELECT 'carrier_rate_variance', CAST(SUM(carrier_rate_variance_usd) AS DECIMAL(18,2)) FROM cdm_tmforum.revenue_assurance.margin_ledger_allocated
+  UNION ALL SELECT 'offnet_grooming_savings', CAST(SUM(sav) * 12 AS DECIMAL(18,2)) FROM gs WHERE sav > 0)
+SELECT check_name, v FROM lev
+UNION ALL SELECT 'wall_identified_total', CAST(SUM(v) AS DECIMAL(18,2)) FROM lev
+UNION ALL SELECT 'c1_ip_vpn_q3_cm', CAST(SUM(cm) AS DECIMAL(18,2)) FROM q3 WHERE product_family = 'IP-VPN'
+UNION ALL SELECT 'c1_legacy_voice_q3_cm', CAST(SUM(cm) AS DECIMAL(18,2)) FROM q3 WHERE product_family = 'Legacy Voice'
+UNION ALL SELECT 'c1_loser_families', CAST(COUNT(*) AS DECIMAL(18,2)) FROM q3 WHERE cm < 0
+UNION ALL SELECT 'c2_grooming_circuits', CAST(COUNT(*) AS DECIMAL(18,2)) FROM gs WHERE sav > 0
+UNION ALL SELECT 'c2_annual_offnet_cost', CAST(SUM(paid) * 12 AS DECIMAL(18,2)) FROM gs WHERE sav > 0
+UNION ALL SELECT 'c3_renewals', CAST(COUNT(*) AS DECIMAL(18,2)) FROM ren
+UNION ALL SELECT 'c3_below_floor', CAST(COUNT_IF(l.cm / l.rev < r.f) AS DECIMAL(18,2)) FROM ren r LEFT JOIN led l ON r.rid = l.mid
+UNION ALL SELECT 'c3_revenue_at_stake', CAST(SUM(CASE WHEN l.cm / l.rev < r.f THEN l.rev END) AS DECIMAL(18,2)) FROM ren r LEFT JOIN led l ON r.rid = l.mid;
