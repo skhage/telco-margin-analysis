@@ -244,6 +244,8 @@ Raw tie-out: margin_circuits (NOT is_on_net AND is_parallel_to_onnet_fiber) join
 
 Raw tie-out: margin_contracts term_end BETWEEN DATE'2026-11-19' AND +90, joined to margin_products and to per-contract SUMs over margin_ledger_allocated, with CM/revenue < margin_floor_pct -> 1,490 / 1,377 / 586 / -1,059,587.28 / 18,890,869.75.
 
+Window boundary (QA-F-RENEWAL-WINDOW-INCLUSIVE, @data-analyst 2026-11-15): the 90-day window is INCLUSIVE at both ends, term_end BETWEEN DATE'2026-11-19' AND DATE'2027-02-17' (DATE'2026-11-19' + 90 = 2027-02-17, so 91 calendar days). This is the margin_renewal_floor_mv is_renewal_next_90d logic and the Margin Genie Sales benchmark. A half-open recompute (term_end < DATE'2027-02-17') gives 584 / CM -1,051,544.08, because 2 below-floor lines end on day 90. Re-verified 2026-11-15 by raw SQL over margin_ledger_allocated: inclusive 586, half-open 584, MV 586. Talk track: "renewals ending in the next 90 days, counting day 90". The MV column comment and the Genie Sales instruction get this wording after Nov 19 (MV freeze DEC-028/DEC-035, Genie freeze DEC-036).
+
 ### S4 Marketing - expected answer (DEC-013)
 
 | Segment | Room to grow | CM (USD) | CM % | Portfolio CM % | Revenue share % | Customer share % | Customers |
