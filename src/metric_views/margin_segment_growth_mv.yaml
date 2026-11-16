@@ -1,20 +1,20 @@
 # Lakelink Fiber Margin Truth - metric view margin_segment_growth_mv v1.0 (P2-MV-SUITE, @data-analyst, 2026-11-13)
-# Deployed to cdm_tmforum._metrics.margin_segment_growth_mv (DEC-001, DEC-013). TBLPROPERTIES telco_project=margin_analysis.
+# Deployed to ${catalog}.${metrics_schema}.margin_segment_growth_mv (DEC-001, DEC-013). TBLPROPERTIES ${project_tag_key}=${project_tag}.
 # Later edits: ALTER VIEW ... AS <body without these # lines>. Expected: CM 2,375,095,705.09; room to grow = Commercial only.
 version: 1.1
 comment: >-
   Lakelink Fiber segment growth metrics for the Marketing persona. Grain: one row per customer segment.
-  Revenue, contribution margin, CM % and customer count come from MEASURE() over cdm_tmforum._metrics.margin_ledger_mv (DEC-002); CM is not redefined here.
+  Revenue, contribution margin, CM % and customer count come from MEASURE() over ${catalog}.${metrics_schema}.margin_ledger_mv (DEC-002); CM is not redefined here.
   Room to grow (DEC-013) = segment CM % above the portfolio CM % AND revenue share below customer-count share.
   Marketing starter question: which segments have the highest margin and the most room to grow? Synonyms: segment margin, growth headroom.
 source: |-
   WITH s AS (
     SELECT segment, MEASURE(revenue) AS revenue_usd, MEASURE(contribution_margin) AS contribution_margin_usd,
            MEASURE(cm_pct) AS segment_cm_pct, MEASURE(customer_count) AS customers
-    FROM cdm_tmforum._metrics.margin_ledger_mv GROUP BY segment),
+    FROM ${catalog}.${metrics_schema}.margin_ledger_mv GROUP BY segment),
   t AS (
     SELECT MEASURE(revenue) AS total_revenue_usd, MEASURE(cm_pct) AS portfolio_cm_pct, MEASURE(customer_count) AS total_customers
-    FROM cdm_tmforum._metrics.margin_ledger_mv)
+    FROM ${catalog}.${metrics_schema}.margin_ledger_mv)
   SELECT s.segment, s.revenue_usd, s.contribution_margin_usd, s.segment_cm_pct, s.customers,
          t.total_revenue_usd, t.portfolio_cm_pct, t.total_customers,
          s.revenue_usd / t.total_revenue_usd AS revenue_share,

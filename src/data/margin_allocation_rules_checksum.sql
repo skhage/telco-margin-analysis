@@ -13,11 +13,11 @@
 --                          04a86a01dc107f47adeee27011f8b786 (note 1479 form).
 
 SELECT md5(concat_ws('||', array_sort(collect_list(concat_ws('|', *))))) AS rules_checksum
-FROM cdm_tmforum.revenue_assurance.margin_allocation_rules;
+FROM ${catalog}.${schema}.margin_allocation_rules;
 
 -- Direct weight read (always pair with the checksum):
 -- expected billing_ops 0.5/0.5, customer_care ticket_count 0.70 / circuit_count 0.30,
 -- field_ops 0.5/0.5, noc bandwidth_mbps 0.40 / circuit_count 0.60
 SELECT rule_id, cost_pool, driver, weight
-FROM cdm_tmforum.revenue_assurance.margin_allocation_rules
+FROM ${catalog}.${schema}.margin_allocation_rules
 ORDER BY rule_id;

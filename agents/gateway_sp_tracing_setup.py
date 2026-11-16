@@ -2,26 +2,37 @@
 
 Owner: @ml-engineer. telco_project=margin_analysis.
 Creates/verifies:
-  1. Unity Gateway model service cdm_tmforum.revenue_assurance.margin_grooming_agent_llm
-     (routes 100% to system.ai claude-sonnet-4-5) with guardrails:
+  1. Unity Gateway model service cfg('gateway_service')
+     (routes 100% to cfg('gateway_backing_model')) with guardrails:
        rank 10 detect_sensitive_data (block, pre+post), rank 20 block_jailbreak (pre),
-       rank 30 block_unsafe_content (pre+post); judges use system.ai.claude-haiku-5-5.
+       rank 30 block_unsafe_content (pre+post); judges use cfg('gateway_fallback_model').
   2. MLflow experiment agents/margin_grooming_agent_traces for tracing every agent step.
   3. Service principal lakelink-margin-grooming-agent (creation needs human confirmation;
      run create_service_principal() only after CEO approval) + least-privilege grants.
-No schemas are created. UC objects live only in cdm_tmforum.revenue_assurance with margin_ prefix.
+No schemas are created. UC objects live only in the configured <catalog>.<schema> with margin_ prefix.
+CONFIG: all names come from bundle/project_config.yml via src/project_config.py.
 """
 import json
+import os
+import sys
 import mlflow
 from databricks.sdk import WorkspaceClient
 
+_d = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
+while not os.path.isfile(os.path.join(_d, "src", "project_config.py")) and os.path.dirname(_d) != _d:
+    _d = os.path.dirname(_d)
+sys.path.insert(0, os.path.join(_d, "src"))
+from project_config import cfg, fq, schema_fq  # noqa: E402
+
 w = WorkspaceClient()
-SCHEMA = "cdm_tmforum.revenue_assurance"
-SERVICE_ID = "margin_grooming_agent_llm"
-SVC_FQN = f"{SCHEMA}.{SERVICE_ID}"
-JUDGE = "system.ai.claude-haiku-5-5"
-EXP_PATH = "/Users/stephen.hage@databricks.com/telco-margin-analysis/agents/margin_grooming_agent_traces"
-SP_NAME = "lakelink-margin-grooming-agent"
+SVC_FQN = cfg("gateway_service")
+SCHEMA, SERVICE_ID = SVC_FQN.rsplit(".", 1)
+JUDGE = cfg("gateway_fallback_model")
+BACKING_MODEL = cfg("gateway_backing_model")
+# Experiment lives next to this file (agents/margin_grooming_agent_traces); id is cfg('mlflow_experiment_id').
+EXP_PATH = os.path.join(_d, "agents", "margin_grooming_agent_traces").replace("/Workspace/", "/", 1)
+SP_NAME = cfg("agent_name")
+TAG_KEY, TAG_VALUE = cfg("project_tag_key"), cfg("project_tag")
 
 POLICIES = [
     {"name": "block-sensitive-data", "policy_type": "POLICY_TYPE_BUILTIN", "handler": "system.ai.detect_sensitive_data", "rank": 10,
@@ -40,12 +51,12 @@ def ensure_model_service():
         return w.api_client.do("GET", path)
     except Exception:
         body = {
-            "comment": "Lakelink Fiber Margin Truth: approved model for the off-net grooming agent (telco_project=margin_analysis).",
+            "comment": f"{cfg('company_name')} Margin Truth: approved model for the off-net grooming agent ({TAG_KEY}={TAG_VALUE}).",
             "config": {
                 "routing": {"destinations": [{
                     "name": "primary",
                     "destination_type": "DESTINATION_TYPE_PAY_PER_TOKEN_FOUNDATION_MODEL",
-                    "pay_per_token_config": {"model": "models/system.ai.databricks-claude-sonnet-4-5"},
+                    "pay_per_token_config": {"model": f"models/{BACKING_MODEL}"},
                     "traffic_percentage": 100}]},
                 "service_policies": POLICIES,
             },
@@ -71,7 +82,7 @@ def ensure_experiment():
     mlflow.set_tracking_uri("databricks")
     exp = mlflow.get_experiment_by_name(EXP_PATH)
     exp_id = exp.experiment_id if exp else mlflow.create_experiment(
-        EXP_PATH, tags={"telco_project": "margin_analysis", "company": "Lakelink Fiber", "agent": "offnet_grooming"})
+        EXP_PATH, tags={TAG_KEY: TAG_VALUE, "company": cfg("company_name"), "agent": "offnet_grooming"})
     mlflow.set_experiment(experiment_id=exp_id)
     return exp_id
 
@@ -90,13 +101,13 @@ def create_service_principal():
 def least_privilege_grants(app_id):
     """Grants for the grooming agent SP. Run after the SP exists and the margin_ objects exist."""
     stmts = [
-        f"GRANT USE CATALOG ON CATALOG cdm_tmforum TO `{app_id}`",
-        f"GRANT USE SCHEMA ON SCHEMA cdm_tmforum.revenue_assurance TO `{app_id}`",
-        f"GRANT USE SCHEMA ON SCHEMA cdm_tmforum._metrics TO `{app_id}`",
-        f"GRANT SELECT ON VIEW cdm_tmforum._metrics.margin_ledger_mv TO `{app_id}`",
-        f"GRANT SELECT ON TABLE cdm_tmforum.revenue_assurance.margin_circuits TO `{app_id}`",
-        f"GRANT SELECT ON TABLE cdm_tmforum.revenue_assurance.margin_vendors TO `{app_id}`",
-        f"GRANT EXECUTE ON FUNCTION cdm_tmforum.revenue_assurance.margin_score_onnet_move TO `{app_id}`",
+        f"GRANT USE CATALOG ON CATALOG {cfg('catalog')} TO `{app_id}`",
+        f"GRANT USE SCHEMA ON SCHEMA {schema_fq('schema')} TO `{app_id}`",
+        f"GRANT USE SCHEMA ON SCHEMA {schema_fq('metrics_schema')} TO `{app_id}`",
+        f"GRANT SELECT ON VIEW {fq('margin_ledger_mv')} TO `{app_id}`",
+        f"GRANT SELECT ON TABLE {fq('margin_circuits')} TO `{app_id}`",
+        f"GRANT SELECT ON TABLE {fq('margin_vendors')} TO `{app_id}`",
+        f"GRANT EXECUTE ON FUNCTION {fq('margin_score_onnet_move')} TO `{app_id}`",
         f"GRANT EXECUTE ON MODEL SERVICE {SVC_FQN} TO `{app_id}`",
     ]
     for s in stmts:

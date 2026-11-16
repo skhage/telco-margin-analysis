@@ -1,6 +1,6 @@
 """Lakelink Fiber Margin Truth: live swarm stall monitor (COO-Q-20261112-22, owner @devops).
 
-Runs tests/stall_detector.sql against the Lakebase task board (telco-margin-analysis-project,
+Runs tests/stall_detector.sql against the Lakebase task board (cfg('taskboard_lakebase_endpoint'),
 public schema) from a Lakeflow Job that is independent of the Genie Code scheduler, so a
 scheduler-side stall (like 11-12 02:56-22:42 UTC) is still detected.
 
@@ -19,13 +19,15 @@ import sys
 import psycopg
 from databricks.sdk import WorkspaceClient
 
-ENDPOINT = os.environ.get(
-    "MARGIN_LAKEBASE_ENDPOINT",
-    "projects/telco-margin-analysis-project/branches/production/endpoints/primary",
-)
-HOST = os.environ.get(
-    "MARGIN_LAKEBASE_HOST", "ep-orange-lab-d2tt5nll.database.us-east-1.cloud.databricks.com"
-)
+_d = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
+while not os.path.isfile(os.path.join(_d, "src", "project_config.py")) and os.path.dirname(_d) != _d:
+    _d = os.path.dirname(_d)
+sys.path.insert(0, os.path.join(_d, "src"))
+from project_config import cfg  # noqa: E402  (bundle/project_config.yml)
+
+ENDPOINT = os.environ.get("MARGIN_LAKEBASE_ENDPOINT", cfg("taskboard_lakebase_endpoint"))
+HOST = os.environ.get("MARGIN_LAKEBASE_HOST", cfg("taskboard_lakebase_host"))
+DB = cfg("lakebase_database")
 STALL_ROLE_THRESHOLD = int(os.environ.get("MARGIN_STALL_ROLE_THRESHOLD", "6"))
 
 
@@ -40,7 +42,7 @@ def main() -> int:
     token = w.postgres.generate_database_credential(endpoint=ENDPOINT).token
     with psycopg.connect(
         host=HOST,
-        dbname="databricks_postgres",
+        dbname=DB,
         user=w.current_user.me().user_name,
         password=token,
         sslmode="require",

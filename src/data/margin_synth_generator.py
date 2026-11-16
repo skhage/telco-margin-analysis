@@ -16,14 +16,16 @@ key set itself: re-running gives the same rows. margin_allocation_rules is owned
 
 HARD RULES enforced by this runner:
   * Never creates schemas or databases (any CREATE/DROP SCHEMA|DATABASE statement aborts the run).
-  * Writes only to <catalog>.<schema> (default cdm_tmforum.revenue_assurance), prefix margin_.
+  * Writes only to <catalog>.<schema> (defaults from bundle/project_config.yml), prefix margin_.
+  * data/*.sql use ${catalog} / ${schema} / ${salesforce_schema} / ... tokens, rendered by
+    src/project_config.py render(); --catalog/--schema override the config for one run.
   * No secrets or tokens; runs with the caller's identity.
 
 Usage (Databricks serverless / cluster, or Databricks Connect):
   python src/data/margin_synth_generator.py                 # dry run: list statements per step
   python src/data/margin_synth_generator.py --execute       # run all steps
   python src/data/margin_synth_generator.py --execute --steps master contracts
-  python src/data/margin_synth_generator.py --execute --catalog cdm_tmforum --schema revenue_assurance
+  python src/data/margin_synth_generator.py --execute --catalog <catalog> --schema <schema>
 """
 from __future__ import annotations
 
@@ -33,8 +35,11 @@ import re
 import sys
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-DEFAULT_CATALOG = "cdm_tmforum"
-DEFAULT_SCHEMA = "revenue_assurance"
+sys.path.insert(0, os.path.join(REPO_ROOT, "src"))
+from project_config import cfg, ident, render  # noqa: E402
+
+DEFAULT_CATALOG = cfg("catalog")
+DEFAULT_SCHEMA = cfg("schema")
 
 # Ordered steps: (key, sql file relative to repo root, tables written)
 STEPS = [
@@ -79,11 +84,8 @@ def split_statements(sql_text: str) -> list[str]:
 
 
 def retarget(stmt: str, catalog: str, schema: str) -> str:
-    """Point writes at <catalog>.<schema>; read-only sources stay in <catalog>."""
-    stmt = stmt.replace(f"{DEFAULT_CATALOG}.{DEFAULT_SCHEMA}.", f"{catalog}.{schema}.")
-    if catalog != DEFAULT_CATALOG:
-        stmt = re.sub(rf"\b{DEFAULT_CATALOG}\.(?!{re.escape(schema)}\.)", f"{catalog}.", stmt)
-    return stmt
+    """Render ${...} config tokens; --catalog/--schema override the config values for this run."""
+    return render(stmt, extra={"catalog": ident(catalog, "catalog"), "schema": ident(schema, "schema")})
 
 
 def load_plan(catalog: str, schema: str, steps: list[str]) -> list[tuple[str, list[str]]]:

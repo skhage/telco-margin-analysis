@@ -3,8 +3,9 @@
 Tag: telco_project=margin_analysis. Owner: @ml-engineer.
 Tool specs + SYSTEM_PROMPT: agents/margin_grooming_agent_tools.py (keep in sync; Auto Mode refuses exec() of
 workspace files, so paste inline when running from executeCode).
-Model: Unity Gateway service cdm_tmforum.revenue_assurance.margin_grooming_agent_llm (guardrails on).
-Tracing: MLflow experiment 1235449331932066. Approval queue: Lakebase telco-margin-analysis-app public.approval_tickets.
+CONFIG: every catalog/schema/table/asset name below comes from bundle/project_config.yml via src/project_config.py.
+Model: Unity Gateway service cfg('gateway_service') (guardrails on).
+Tracing: MLflow experiment cfg('mlflow_experiment_id'). Approval queue: Lakebase cfg('app_lakebase_endpoint') public.approval_tickets.
 STUB MODE: ask_margin_genie and score_onnet_move return stubbed values until P3-MARGIN-GENIE and
 P4-UC-FN-ONNET-SCORE land; swap in real tools for P4-GROOMING-AGENT. Stub tickets use ticket_id TEST-GROOM-* and
 rationale prefixed TEST.
@@ -33,7 +34,7 @@ offnet_grooming ticket already exists for the circuit, so re-runs never duplicat
 
 SCENE-6 HERO TRACE (COO-Q-20261113-28 / QA-F-TRACE-SUITE-MV-R1, 2026-11-13): DRY_RUN trace
 tr-7e87cf4df0dfdbf4a2ae39e1f1ab0478 - ask_margin_genie genie_basis=margin_genie, Genie SQL FROM
-cdm_tmforum._metrics.margin_offnet_spend_mv WHERE is_grooming_candidate, total_row_count=47 (same 47 candidates as the
+<metrics_schema>.margin_offnet_spend_mv WHERE is_grooming_candidate, total_row_count=47 (same 47 candidates as the
 scene-4 Ops answer: annual off-net cost 1,152,342.12, est. annual savings 412,539.96, DEC-026); dedup returned GROOM-44c3612b69 / GROOM-6d8f8ce31e, 0 new tickets.
 Ask Genie the exact scene-4 Ops question so it routes to the suite MV.
 
@@ -49,56 +50,67 @@ import mlflow, psycopg
 from mlflow.entities import SpanType
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import StatementParameterListItem
+import os, sys
+
+# Project config (bundle/project_config.yml): walk up to <repo>/src and import the loader.
+_d = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
+while not os.path.isfile(os.path.join(_d, "src", "project_config.py")) and os.path.dirname(_d) != _d:
+    _d = os.path.dirname(_d)
+sys.path.insert(0, os.path.join(_d, "src"))
+from project_config import cfg, fq, render, warehouse_id  # noqa: E402
 
 STUB_MODE = False
 DRY_RUN = True  # True = validate tickets but never INSERT into the app approval queue
-MARGIN_GENIE_SPACE_ID = "01f1df115a08164aab3ae5f6faac807c"  # Lakelink Fiber Margin Genie (P3-MARGIN-GENIE); None -> sql_standin
-WAREHOUSE_ID = "bf0baa637e887c80"
+MARGIN_GENIE_SPACE_ID = cfg("genie_space_id") or None  # Margin Genie (P3-MARGIN-GENIE); None -> sql_standin
+WAREHOUSE_ID = warehouse_id()  # env DATABRICKS_WAREHOUSE_ID, else resolved from cfg('warehouse_name')
 GENIE_TIMEOUT_S = 25   # DEC-057: Genie poll cap (fits the 65 s stage cutoff)
 RUN_DEADLINE_S = 60    # DEC-057: no approval_tickets INSERT after this many seconds from run start
 _last_basis = {}
 _run_start = {"t": None}
 
-GENIE_FALLBACK_SQL = """
+GENIE_FALLBACK_SQL = render("""
 WITH latest AS (SELECT circuit_id, paid_amount_usd, ROW_NUMBER() OVER (PARTITION BY circuit_id ORDER BY invoice_month DESC) rn
-                FROM cdm_tmforum.revenue_assurance.margin_carrier_invoices)
+                FROM ${margin_carrier_invoices})
 SELECT c.circuit_id, v.vendor_name, c.vendor_id, c.onnet_distance_m, c.bandwidth_mbps, l.paid_amount_usd AS latest_monthly_paid_usd
-FROM cdm_tmforum.revenue_assurance.margin_circuits c
-JOIN cdm_tmforum.revenue_assurance.margin_vendors v ON v.vendor_id = c.vendor_id
+FROM ${margin_circuits} c
+JOIN ${margin_vendors} v ON v.vendor_id = c.vendor_id
 LEFT JOIN latest l ON l.circuit_id = c.circuit_id AND l.rn = 1
 WHERE c.is_on_net = FALSE AND c.is_parallel_to_onnet_fiber AND c.circuit_id IN (45040, 98532)
-ORDER BY l.paid_amount_usd DESC NULLS LAST"""
+ORDER BY l.paid_amount_usd DESC NULLS LAST""")
 
 # Genie stand-in (ML-GROOMING-DRYRUN-TOOLS): margin figures come ONLY from margin_ledger_mv MEASURE() (DEC-002/020);
 # candidate filter = DEC-017 Ops hero filter (parallel to own fiber AND savings > 0) -> 47 rows.
-GENIE_STANDIN_SQL = """
-WITH s AS (SELECT * FROM cdm_tmforum.revenue_assurance.margin_score_onnet_move(CAST(NULL AS BIGINT))
+GENIE_STANDIN_SQL = render("""
+WITH s AS (SELECT * FROM ${margin_score_onnet_move}(CAST(NULL AS BIGINT))
            WHERE is_parallel_to_onnet_fiber AND est_monthly_savings_usd > 0),
 cm AS (SELECT circuit_id, MEASURE(contribution_margin) AS contribution_margin_usd,
               MEASURE(offnet_network_expense) AS offnet_network_expense_usd
-       FROM cdm_tmforum._metrics.margin_ledger_mv
+       FROM ${margin_ledger_mv}
        WHERE is_on_net = FALSE AND circuit_id IN (SELECT circuit_id FROM s) GROUP BY circuit_id)
 SELECT s.circuit_id, s.vendor_id, s.monthly_offnet_cost_usd, s.est_monthly_savings_usd, s.score,
        cm.contribution_margin_usd, cm.offnet_network_expense_usd
 FROM s LEFT JOIN cm ON cm.circuit_id = s.circuit_id
 ORDER BY s.score DESC, s.est_monthly_savings_usd DESC
-LIMIT 10"""
+LIMIT 10""")
 
-PROXY_SQL = """
+PROXY_SQL = render("""
 SELECT c.circuit_id, c.vendor_id, c.is_parallel_to_onnet_fiber, c.onnet_distance_m,
        CAST(rc.proxy_cost AS DECIMAL(18,2)) AS monthly_offnet_cost_usd,
        CAST(rc.proxy_cost - (2.00*COALESCE(c.bandwidth_mbps,0) + 0.50*COALESCE(c.onnet_distance_m,0)/36) AS DECIMAL(18,2)) AS est_monthly_savings_usd
-FROM cdm_tmforum.revenue_assurance.margin_circuits c
-JOIN cdm_tmforum.revenue_assurance.margin_vendors v ON v.vendor_id = c.vendor_id
+FROM ${margin_circuits} c
+JOIN ${margin_vendors} v ON v.vendor_id = c.vendor_id
 JOIN (VALUES (0.06,1364.58),(1.54,909.72),(100.00,1187.69),(500.00,492.01),(1000.00,1286.96),(10000.00,5614.77),(100000.00,20383.93)) AS rc(bw, proxy_cost)
   ON rc.bw = c.bandwidth_mbps
-WHERE c.is_on_net = FALSE AND (:cid IS NULL OR c.circuit_id = :cid)"""
-GATEWAY_SERVICE = "cdm_tmforum.revenue_assurance.margin_grooming_agent_llm"
-SCORE_FUNCTION = "cdm_tmforum.revenue_assurance.margin_score_onnet_move"
-MLFLOW_EXPERIMENT_ID = "1235449331932066"
-APP_ENDPOINT = "projects/telco-margin-analysis-app/branches/production/endpoints/primary"
-APP_HOST = "ep-calm-king-d2mq878u.database.us-east-1.cloud.databricks.com"
-AGENT_NAME = "lakelink-margin-grooming-agent"
+WHERE c.is_on_net = FALSE AND (:cid IS NULL OR c.circuit_id = :cid)""")
+GATEWAY_SERVICE = cfg("gateway_service")
+SCORE_FUNCTION = fq("margin_score_onnet_move")
+MLFLOW_EXPERIMENT_ID = str(cfg("mlflow_experiment_id"))
+APP_ENDPOINT = cfg("app_lakebase_endpoint")
+APP_HOST = cfg("app_lakebase_host")
+APP_DB = cfg("lakebase_database")
+AGENT_NAME = cfg("agent_name")
+TAG_KEY, TAG_VALUE = cfg("project_tag_key"), cfg("project_tag")
+CM_MV, OFFNET_MV = fq("margin_ledger_mv"), fq("margin_offnet_spend_mv")
 AGENT_SP_APP_ID = None  # set when SP lakelink-margin-grooming-agent exists (P4-GATEWAY-SP-TRACING)
 # INSERT CAP (COO-Q-20261114-2, 2026-11-14): live runs insert at most MAX_NEW_TICKETS tickets, and only for circuits in
 # INSERT_ALLOWLIST (None = any qualifying circuit). Hero live trace tr-2b088edfed85d22b2db662a6c0a7c68e inserted
@@ -119,7 +131,7 @@ from margin_grooming_agent_tools import SYSTEM_PROMPT, TOOLS  # noqa: E402  (whe
 
 def app_conn():
     tok = w.postgres.generate_database_credential(endpoint=APP_ENDPOINT).token
-    return psycopg.connect(host=APP_HOST, dbname="databricks_postgres", user=w.current_user.me().user_name,
+    return psycopg.connect(host=APP_HOST, dbname=APP_DB, user=w.current_user.me().user_name,
                            password=tok, sslmode="require", autocommit=True)
 
 
@@ -329,7 +341,7 @@ def draft_savings_ticket(circuit_id, vendor_id, monthly_cost, est_monthly_saving
                VALUES (%s,'offnet_grooming','Ops',%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s)""",
             (tid, f"Move circuit {circuit_id} on-net (Lakelink Fiber)", str(circuit_id), vendor_id, monthly_cost,
              est_monthly_savings, rationale,
-             json.dumps({"stub_run": STUB_MODE, "run_as": me, "telco_project": "margin_analysis", **extra}),
+             json.dumps({"stub_run": STUB_MODE, "run_as": me, TAG_KEY: TAG_VALUE, **extra}),
              AGENT_NAME, AGENT_SP_APP_ID, AGENT_NAME if AGENT_SP_APP_ID else None, MLFLOW_EXPERIMENT_ID, trace_id))
         cur.execute("INSERT INTO public.approval_audit (ticket_id, action, actor, actor_role, details) VALUES (%s,'created',%s,'agent',%s::jsonb)",
                     (tid, me, json.dumps({"agent": AGENT_NAME, "trace_id": trace_id, "stub_run": STUB_MODE, **extra})))
@@ -354,11 +366,11 @@ def gateway_chat(messages):
 # Known answers: CM 2,375,095,705.09; 47 candidates; annual off-net cost 1,152,342.12 (= MEASURE(candidate_monthly_cost)*12);
 # annual estimated savings 412,539.96 (DEC-026 labels). Read-only; no margin math in the agent.
 CM_REFERENCE_SQL = ("SELECT CAST(MEASURE(contribution_margin) AS DECIMAL(38,2)) AS portfolio_contribution_margin_usd "
-                    "FROM cdm_tmforum._metrics.margin_ledger_mv")
+                    f"FROM {CM_MV}")
 OFFNET_REFERENCE_SQL = ("SELECT MEASURE(grooming_candidate_count) AS grooming_candidate_count, "
                         "CAST(MEASURE(candidate_monthly_cost) * 12 AS DECIMAL(31,2)) AS annual_offnet_cost_usd, "
                         "MEASURE(est_annual_savings) AS est_annual_savings_usd "
-                        "FROM cdm_tmforum._metrics.margin_offnet_spend_mv WHERE is_grooming_candidate")
+                        f"FROM {OFFNET_MV} WHERE is_grooming_candidate")
 
 
 def _run_sql_with_id(sql):
@@ -376,8 +388,8 @@ def _run_sql_with_id(sql):
 def margin_metric_view_reference():
     cm_id, cm = _run_sql_with_id(CM_REFERENCE_SQL)
     off_id, off = _run_sql_with_id(OFFNET_REFERENCE_SQL)
-    out = {"metric_view_cm": "cdm_tmforum._metrics.margin_ledger_mv", "cm_statement_id": cm_id, **cm,
-           "metric_view_offnet": "cdm_tmforum._metrics.margin_offnet_spend_mv", "offnet_statement_id": off_id, **off}
+    out = {"metric_view_cm": CM_MV, "cm_statement_id": cm_id, **cm,
+           "metric_view_offnet": OFFNET_MV, "offnet_statement_id": off_id, **off}
     mlflow.get_current_active_span().set_attributes({k: str(v) for k, v in out.items()})
     return out
 
@@ -413,7 +425,7 @@ def basis_label(text):
 def run_agent(task, max_turns=8):
     _run_start["t"] = time.time()  # DEC-057 deadline clock
     _last_basis.clear()
-    mlflow.update_current_trace(tags={"telco_project": "margin_analysis", "company": "Lakelink Fiber",
+    mlflow.update_current_trace(tags={TAG_KEY: TAG_VALUE, "company": cfg("company_name"),
                                       "stub_run": str(STUB_MODE).lower(), "dry_run": str(DRY_RUN).lower(),
                                       "genie_mode": "margin_genie" if MARGIN_GENIE_SPACE_ID else "sql_standin",
                                       "genie_space_id": str(MARGIN_GENIE_SPACE_ID),

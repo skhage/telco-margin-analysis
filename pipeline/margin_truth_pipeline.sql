@@ -1,8 +1,9 @@
 -- ============================================================
 -- Lakelink Fiber — Margin Truth SDP Pipeline
--- Target: cdm_tmforum.revenue_assurance (no new schemas)
+-- Target: ${catalog}.${schema} (no new schemas)
 -- Layers: Bronze (Auto Loader) → Silver (ai_parse/ai_extract) → Gold (margin_ledger)
--- Tag: telco_project = margin_analysis
+-- Tag: ${project_tag_key} = ${project_tag}
+-- CONFIG: placeholder values come from the pipeline `configuration` block (bundle/resources/margin_pipeline.pipeline.yml <- bundle/project_config.yml).
 -- Task: P1-SDP-PIPELINE (column COMMENTs added 2026-11-13 for QA-F-PIPELINE-COMMENTS; 100% columns)
 -- ============================================================
 
@@ -15,15 +16,15 @@ CREATE OR REFRESH STREAMING TABLE margin_bronze_invoice_docs (
   length BIGINT COMMENT 'Size of the PDF file in bytes. Synonyms: file size.',
   modificationTime TIMESTAMP COMMENT 'Last modified timestamp of the PDF file in the volume (UTC). Used by Auto Loader for incremental ingest. Synonyms: file timestamp, landed at.'
 )
-COMMENT 'Raw carrier invoice PDFs ingested via Auto Loader from the margin_documents UC volume. Grain: one row per PDF file. Source: /Volumes/cdm_tmforum/revenue_assurance/margin_documents/carrier_invoices/'
-TBLPROPERTIES ('telco_project' = 'margin_analysis')
+COMMENT 'Raw carrier invoice PDFs ingested via Auto Loader from the margin_documents UC volume. Grain: one row per PDF file. Source: /Volumes/${catalog}/${schema}/${documents_volume}/carrier_invoices/'
+TBLPROPERTIES ('${project_tag_key}' = '${project_tag}')
 AS SELECT
   path,
   content,
   length,
   modificationTime
 FROM STREAM(read_files(
-  '/Volumes/cdm_tmforum/revenue_assurance/margin_documents/carrier_invoices/',
+  '/Volumes/${catalog}/${schema}/${documents_volume}/carrier_invoices/',
   format => 'binaryFile'
 ));
 
@@ -35,7 +36,7 @@ CREATE OR REFRESH MATERIALIZED VIEW margin_silver_invoice_parsed (
   extracted VARIANT COMMENT 'VARIANT of fields extracted by ai_extract from the parsed PDF: invoice_number, vendor_name, circuit_id, invoice_month (YYYY-MM), invoiced_rate_usd, vendor_contract_rate_usd, paid_amount_usd (US dollars). Synonyms: parsed invoice fields, extracted fields.'
 )
 COMMENT 'Parsed carrier invoice PDFs with structured fields extracted via ai_parse_document and ai_extract. Grain: one row per PDF. Enables scene 2 lineage trace from ledger back to source document.'
-TBLPROPERTIES ('telco_project' = 'margin_analysis')
+TBLPROPERTIES ('${project_tag_key}' = '${project_tag}')
 AS
 WITH parsed AS (
   SELECT
@@ -103,17 +104,17 @@ CREATE OR REFRESH MATERIALIZED VIEW margin_ledger_v2 (
   CONSTRAINT revenue_not_null EXPECT (revenue_usd IS NOT NULL),
   -- Informational PK/FK (DP-F-LEDGER-V2-PKFK): parity with margin_ledger for the Genie ontology
   CONSTRAINT margin_ledger_v2_pk PRIMARY KEY (ledger_month, customer_id, product_id, circuit_id),
-  CONSTRAINT margin_ledger_v2_customer_fk FOREIGN KEY (customer_id) REFERENCES cdm_tmforum.revenue_assurance.margin_customers (customer_id),
-  CONSTRAINT margin_ledger_v2_product_fk  FOREIGN KEY (product_id)  REFERENCES cdm_tmforum.revenue_assurance.margin_products (product_id),
-  CONSTRAINT margin_ledger_v2_circuit_fk  FOREIGN KEY (circuit_id)  REFERENCES cdm_tmforum.revenue_assurance.margin_circuits (circuit_id),
-  CONSTRAINT margin_ledger_v2_contract_fk FOREIGN KEY (contract_id) REFERENCES cdm_tmforum.revenue_assurance.margin_contracts (contract_id),
-  CONSTRAINT margin_ledger_v2_vendor_fk   FOREIGN KEY (vendor_id)   REFERENCES cdm_tmforum.revenue_assurance.margin_vendors (vendor_id)
+  CONSTRAINT margin_ledger_v2_customer_fk FOREIGN KEY (customer_id) REFERENCES ${catalog}.${schema}.margin_customers (customer_id),
+  CONSTRAINT margin_ledger_v2_product_fk  FOREIGN KEY (product_id)  REFERENCES ${catalog}.${schema}.margin_products (product_id),
+  CONSTRAINT margin_ledger_v2_circuit_fk  FOREIGN KEY (circuit_id)  REFERENCES ${catalog}.${schema}.margin_circuits (circuit_id),
+  CONSTRAINT margin_ledger_v2_contract_fk FOREIGN KEY (contract_id) REFERENCES ${catalog}.${schema}.margin_contracts (contract_id),
+  CONSTRAINT margin_ledger_v2_vendor_fk   FOREIGN KEY (vendor_id)   REFERENCES ${catalog}.${schema}.margin_vendors (vendor_id)
 )
-COMMENT 'Lakelink Fiber margin ledger (gold, pipeline build). Same schema and logic as fast-path margin_ledger (DEC-008); canonical source of margin_ledger_allocated since the DEC-023 repoint (no drop, no rename). For margin answers use metric view cdm_tmforum._metrics.margin_ledger_mv; contribution margin is defined only there (DEC-002). Do not SUM raw columns here. Grain: customer x product x circuit x month. Source: margin_billing, margin_carrier_invoices, margin_contracts, margin_circuits, margin_products, margin_customers, margin_gl_actuals, margin_allocation_rules.'
-TBLPROPERTIES ('telco_project' = 'margin_analysis')
+COMMENT 'Lakelink Fiber margin ledger (gold, pipeline build). Same schema and logic as fast-path margin_ledger (DEC-008); canonical source of margin_ledger_allocated since the DEC-023 repoint (no drop, no rename). For margin answers use metric view ${catalog}.${metrics_schema}.margin_ledger_mv; contribution margin is defined only there (DEC-002). Do not SUM raw columns here. Grain: customer x product x circuit x month. Source: margin_billing, margin_carrier_invoices, margin_contracts, margin_circuits, margin_products, margin_customers, margin_gl_actuals, margin_allocation_rules.'
+TBLPROPERTIES ('${project_tag_key}' = '${project_tag}')
 -- DE-ROWFILTER-LEDGER-V2 (2026-11-13): Sales own-accounts row filter, same function as margin_ledger/margin_customers/margin_contracts.
 -- Non-Sales principals are unfiltered, so MEASURE(contribution_margin) stays 2,375,095,705.09.
-WITH ROW FILTER cdm_tmforum.revenue_assurance.margin_sales_row_filter ON (customer_id)
+WITH ROW FILTER ${catalog}.${schema}.margin_sales_row_filter ON (customer_id)
 AS
 WITH base AS (
   SELECT
@@ -155,12 +156,12 @@ WITH base AS (
     ) AS ticket_count,
     regexp_replace(s.path, '^dbfs:', '')                     AS source_pdf_path,
     CAST(s.extracted:response.invoice_number.value AS STRING) AS source_pdf_invoice_number
-  FROM      cdm_tmforum.revenue_assurance.margin_billing          b
-  JOIN      cdm_tmforum.revenue_assurance.margin_circuits          c  ON c.circuit_id  = b.circuit_id
-  JOIN      cdm_tmforum.revenue_assurance.margin_contracts         k  ON k.contract_id = b.contract_id
-  JOIN      cdm_tmforum.revenue_assurance.margin_products          p  ON p.product_id  = k.product_id
-  JOIN      cdm_tmforum.revenue_assurance.margin_customers         u  ON u.customer_id = b.customer_id
-  LEFT JOIN cdm_tmforum.revenue_assurance.margin_carrier_invoices ci  ON ci.circuit_id = b.circuit_id
+  FROM      ${catalog}.${schema}.margin_billing          b
+  JOIN      ${catalog}.${schema}.margin_circuits          c  ON c.circuit_id  = b.circuit_id
+  JOIN      ${catalog}.${schema}.margin_contracts         k  ON k.contract_id = b.contract_id
+  JOIN      ${catalog}.${schema}.margin_products          p  ON p.product_id  = k.product_id
+  JOIN      ${catalog}.${schema}.margin_customers         u  ON u.customer_id = b.customer_id
+  LEFT JOIN ${catalog}.${schema}.margin_carrier_invoices ci  ON ci.circuit_id = b.circuit_id
                                                                     AND ci.invoice_month = b.billing_month
   -- QA-F-S2-PDF-LINEAGE: gold reads silver so table_lineage shows PDF -> bronze -> silver -> ledger.
   -- Silver grain = one row per PDF path; Auto Loader paths carry a 'dbfs:' prefix. Attributes only, no CM impact.
@@ -179,8 +180,8 @@ pools AS (
   SELECT g.period_month AS ledger_month,
          r.driver,
          SUM(g.amount_usd * r.weight) AS amt
-  FROM cdm_tmforum.revenue_assurance.margin_gl_actuals        g
-  JOIN cdm_tmforum.revenue_assurance.margin_allocation_rules  r
+  FROM ${catalog}.${schema}.margin_gl_actuals        g
+  JOIN ${catalog}.${schema}.margin_allocation_rules  r
     ON r.cost_pool = g.cost_pool
    AND r.is_active
    AND g.period_month >= r.effective_from

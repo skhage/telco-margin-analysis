@@ -1,7 +1,7 @@
 # Lakelink Fiber - Margin Truth: job that (re)creates the margin_ UC functions in the EXISTING
 # schema ${var.catalog}.${var.schema}. LIVE (DEVOPS-BUNDLE-LIVE-ASSETS, 2026-11-13): both functions
-# exist in cdm_tmforum.revenue_assurance (margin_score_onnet_move 2026-11-12, margin_compare_rates
-# 2026-11-13). The SQL files hard-code cdm_tmforum.revenue_assurance (= the bundle defaults).
+# exist in the configured schema (margin_score_onnet_move 2026-11-12, margin_compare_rates
+# 2026-11-13). The SQL files read {{catalog}} / {{schema}} task parameters filled from ../project_config.yml.
 # CREATE OR REPLACE FUNCTION only; never creates schemas.
 resources:
   jobs:
@@ -16,6 +16,12 @@ resources:
             file:
               path: ../../agents/margin_score_onnet_move.sql
               source: WORKSPACE
+            parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+              metrics_schema: ${var.metrics_schema}
+              project_tag_key: ${var.project_tag_key}
+              project_tag: ${var.project_tag}
         - task_key: margin_compare_rates
           depends_on:
             - task_key: margin_score_onnet_move
@@ -24,3 +30,9 @@ resources:
             file:
               path: ../../agents/margin_compare_rates.sql
               source: WORKSPACE
+            parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+              metrics_schema: ${var.metrics_schema}
+              project_tag_key: ${var.project_tag_key}
+              project_tag: ${var.project_tag}

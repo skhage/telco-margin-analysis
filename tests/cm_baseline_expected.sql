@@ -10,7 +10,7 @@ SELECT COALESCE(product_family, '__TOTAL__')                                   A
        CAST(SUM(network_expense_usd) AS DECIMAL(18,2))                          AS network_expense_usd,
        CAST(SUM(cost_to_serve_usd) AS DECIMAL(18,2))                            AS cost_to_serve_usd,
        CAST(SUM(revenue_usd - network_expense_usd - cost_to_serve_usd) AS DECIMAL(18,2)) AS contribution_margin_usd
-FROM cdm_tmforum.revenue_assurance.margin_ledger
+FROM ${catalog}.${schema}.margin_ledger
 GROUP BY ROLLUP(product_family)
 ORDER BY contribution_margin_usd DESC;
 
@@ -30,7 +30,7 @@ ORDER BY contribution_margin_usd DESC;
 --     Full Q3 CM (USD M): Wavelength 451.716, Dedicated Internet 106.708, Colocation 24.933, Ethernet 11.798, Managed 2.577.
 SELECT product_family,
        CAST(SUM(revenue_usd - network_expense_usd - cost_to_serve_usd) AS DECIMAL(18,2)) AS contribution_margin_usd
-FROM cdm_tmforum.revenue_assurance.margin_ledger
+FROM ${catalog}.${schema}.margin_ledger
 WHERE ledger_month BETWEEN DATE'2026-07-01' AND DATE'2026-09-01'
 GROUP BY product_family
 ORDER BY contribution_margin_usd;
@@ -40,23 +40,23 @@ ORDER BY contribution_margin_usd;
 --     cost_to_serve vs margin_gl_actuals account_class='cost_to_serve_pool' = 360274000.00 (diff 17.43)
 --     network_expense vs margin_gl_actuals account_class='network_expense' = 1651978299.56 (diff 77843.02, 0.005%)
 SELECT 'billing_revenue' AS check_name, CAST(SUM(billed_amount_usd) AS DECIMAL(18,2)) AS amount_usd
-FROM cdm_tmforum.revenue_assurance.margin_billing
+FROM ${catalog}.${schema}.margin_billing
 WHERE billing_month BETWEEN DATE'2025-11-01' AND DATE'2026-10-01'
 UNION ALL
 SELECT account_class, CAST(SUM(amount_usd) AS DECIMAL(18,2))
-FROM cdm_tmforum.revenue_assurance.margin_gl_actuals
+FROM ${catalog}.${schema}.margin_gl_actuals
 WHERE period_month BETWEEN DATE'2025-11-01' AND DATE'2026-10-01'
 GROUP BY account_class;
 
 -- (4a) Ops starter question, CANONICAL (DEC-017): off-net AND parallel AND savings > 0. Expected 47 (verified @qa 2026-11-13; featured 45040 = 879.34, 98532 = 469.00)
 SELECT COUNT(DISTINCT s.circuit_id) AS hero_circuits
-FROM cdm_tmforum.revenue_assurance.margin_score_onnet_move(NULL) s
-JOIN cdm_tmforum.revenue_assurance.margin_circuits c USING (circuit_id)
+FROM ${catalog}.${schema}.margin_score_onnet_move(NULL) s
+JOIN ${catalog}.${schema}.margin_circuits c USING (circuit_id)
 WHERE NOT c.is_on_net AND s.is_parallel_to_onnet_fiber AND s.est_monthly_savings_usd > 0;
 
 -- (4b) Ops band sub-view only (note 206 definition, not the benchmark answer): expected 12 circuits
 SELECT COUNT(*) AS hero_circuits
-FROM cdm_tmforum.revenue_assurance.margin_circuits
+FROM ${catalog}.${schema}.margin_circuits
 WHERE NOT is_on_net AND is_parallel_to_onnet_fiber AND bandwidth_mbps = 1000
   AND onnet_distance_m BETWEEN 51 AND 172;
 
@@ -66,7 +66,7 @@ WITH s AS (
   SELECT segment, SUM(revenue_usd) AS rev,
          SUM(revenue_usd - network_expense_usd - cost_to_serve_usd) AS cm,
          COUNT(DISTINCT customer_id) AS cust
-  FROM cdm_tmforum.revenue_assurance.margin_ledger GROUP BY segment),
+  FROM ${catalog}.${schema}.margin_ledger GROUP BY segment),
 t AS (SELECT SUM(rev) AS trev, SUM(cm) AS tcm, SUM(cust) AS tcust FROM s)
 SELECT segment, cm / rev AS cm_pct, rev / trev AS revenue_share, cust / tcust AS customer_share
 FROM s CROSS JOIN t
@@ -77,10 +77,10 @@ WHERE cm / rev > tcm / trev AND rev / trev < cust / tcust;
 --     as_of 2026-11-13: 1,506 renewals, 1,392 with ledger rows, 603 below floor; as_of 2026-11-19: 1,490 / 1,377 / 586. The board's 598 / 1,381 is neither.
 --     Before the MV exists this uses raw SQL; switch to MEASURE() on margin_ledger_mv once deployed.
 WITH r AS (SELECT c.contract_id, p.margin_floor_pct
-           FROM cdm_tmforum.revenue_assurance.margin_contracts c JOIN cdm_tmforum.revenue_assurance.margin_products p USING (product_id)
+           FROM ${catalog}.${schema}.margin_contracts c JOIN ${catalog}.${schema}.margin_products p USING (product_id)
            WHERE c.term_end BETWEEN DATE'2026-11-19' AND date_add(DATE'2026-11-19', 90)),
 m AS (SELECT contract_id, SUM(revenue_usd - network_expense_usd - cost_to_serve_usd) / NULLIF(SUM(revenue_usd), 0) AS cm_pct
-      FROM cdm_tmforum.revenue_assurance.margin_ledger GROUP BY contract_id)
+      FROM ${catalog}.${schema}.margin_ledger GROUP BY contract_id)
 SELECT COUNT(*) AS renewals, COUNT(m.contract_id) AS with_ledger,
        SUM(CASE WHEN m.cm_pct < r.margin_floor_pct THEN 1 ELSE 0 END) AS below_floor
 FROM r LEFT JOIN m USING (contract_id);
@@ -101,30 +101,30 @@ FROM r LEFT JOIN m USING (contract_id);
 --     NOTE legacy repricing = -SUM of negative legacy-family CM at PRODUCT grain (27609396.70); contract/circuit grain gives 28765541.75.
 WITH q3 AS (
   SELECT product_family, SUM(revenue_usd - network_expense_usd - cost_to_serve_usd) AS cm
-  FROM cdm_tmforum.revenue_assurance.margin_ledger_allocated
+  FROM ${catalog}.${schema}.margin_ledger_allocated
   WHERE ledger_month >= DATE'2026-07-01' AND ledger_month < DATE'2026-10-01' GROUP BY product_family),
 groom AS (
   SELECT i.circuit_id, MAX_BY(i.paid_amount_usd, i.invoice_month) AS paid, MAX(c.bandwidth_mbps) AS bw, MAX(c.onnet_distance_m) AS d
-  FROM cdm_tmforum.revenue_assurance.margin_carrier_invoices i
-  JOIN cdm_tmforum.revenue_assurance.margin_circuits c ON i.circuit_id = c.circuit_id
+  FROM ${catalog}.${schema}.margin_carrier_invoices i
+  JOIN ${catalog}.${schema}.margin_circuits c ON i.circuit_id = c.circuit_id
   WHERE NOT c.is_on_net AND c.is_parallel_to_onnet_fiber GROUP BY i.circuit_id),
 gs AS (SELECT ROUND(paid, 2) AS paid, ROUND(paid - (2 * bw + 0.5 * d / 36), 2) AS sav FROM groom),
 ren AS (
   SELECT c.contract_id AS rid, p.margin_floor_pct AS f
-  FROM cdm_tmforum.revenue_assurance.margin_contracts c
-  JOIN cdm_tmforum.revenue_assurance.margin_products p ON c.product_id = p.product_id
+  FROM ${catalog}.${schema}.margin_contracts c
+  JOIN ${catalog}.${schema}.margin_products p ON c.product_id = p.product_id
   WHERE c.term_end BETWEEN DATE'2026-11-19' AND date_add(DATE'2026-11-19', 90)),
 led AS (
   SELECT contract_id AS mid, SUM(revenue_usd) AS rev, SUM(revenue_usd - network_expense_usd - cost_to_serve_usd) AS cm
-  FROM cdm_tmforum.revenue_assurance.margin_ledger_allocated GROUP BY contract_id),
+  FROM ${catalog}.${schema}.margin_ledger_allocated GROUP BY contract_id),
 legacy AS (
   SELECT product_id, SUM(revenue_usd - network_expense_usd - cost_to_serve_usd) AS cm
-  FROM cdm_tmforum.revenue_assurance.margin_ledger_allocated WHERE family_class = 'legacy' GROUP BY product_id),
+  FROM ${catalog}.${schema}.margin_ledger_allocated WHERE family_class = 'legacy' GROUP BY product_id),
 lev AS (
   SELECT 'legacy_repricing' AS check_name, CAST(-SUM(cm) AS DECIMAL(18,2)) AS v FROM legacy WHERE cm < 0
-  UNION ALL SELECT 'revenue_leakage', CAST(SUM(expected_revenue_usd) - SUM(revenue_usd) AS DECIMAL(18,2)) FROM cdm_tmforum.revenue_assurance.margin_ledger_allocated
+  UNION ALL SELECT 'revenue_leakage', CAST(SUM(expected_revenue_usd) - SUM(revenue_usd) AS DECIMAL(18,2)) FROM ${catalog}.${schema}.margin_ledger_allocated
   UNION ALL SELECT 'renewal_floor_gap', CAST(SUM(CASE WHEN l.cm / l.rev < r.f THEN (r.f - l.cm / l.rev) * l.rev END) AS DECIMAL(18,2)) FROM ren r LEFT JOIN led l ON r.rid = l.mid
-  UNION ALL SELECT 'carrier_rate_variance', CAST(SUM(carrier_rate_variance_usd) AS DECIMAL(18,2)) FROM cdm_tmforum.revenue_assurance.margin_ledger_allocated
+  UNION ALL SELECT 'carrier_rate_variance', CAST(SUM(carrier_rate_variance_usd) AS DECIMAL(18,2)) FROM ${catalog}.${schema}.margin_ledger_allocated
   UNION ALL SELECT 'offnet_grooming_savings', CAST(SUM(sav) * 12 AS DECIMAL(18,2)) FROM gs WHERE sav > 0)
 SELECT check_name, v FROM lev
 UNION ALL SELECT 'wall_identified_total', CAST(SUM(v) AS DECIMAL(18,2)) FROM lev

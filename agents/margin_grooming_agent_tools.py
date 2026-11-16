@@ -4,26 +4,34 @@ Tag: telco_project=margin_analysis. Owner: @ml-engineer.
 
 Design rule: the agent NEVER computes contribution margin itself. Contribution margin
 (revenue - network_expense - cost_to_serve) is defined ONCE in
-cdm_tmforum._metrics.margin_ledger_mv (DEC-002) and reaches the agent only through
+the metric view fq('margin_ledger_mv') (DEC-002) and reaches the agent only through
 the ask_margin_genie tool (Margin Genie -> margin_ledger_mv). Circuit scoring comes
 only from the UC function margin_score_onnet_move. The agent only copies tool
 outputs into the ticket; it has no calculator tool.
 
-Model: Unity Gateway service cdm_tmforum.revenue_assurance.margin_grooming_agent_llm
+Model: Unity Gateway service cfg('gateway_service')
 (guardrails: block-sensitive-data, block-jailbreak, block-unsafe-content).
-Tracing: MLflow experiment 1235449331932066 (agents/margin_grooming_agent_traces).
+Tracing: MLflow experiment cfg('mlflow_experiment_id') (agents/margin_grooming_agent_traces).
+CONFIG: all names come from bundle/project_config.yml via src/project_config.py.
 Identity: service principal lakelink-margin-grooming-agent (pending human creation,
 see P4-GATEWAY-SP-TRACING).
 """
 
-CATALOG = "cdm_tmforum"
-SCHEMA = "revenue_assurance"
-GATEWAY_SERVICE = f"{CATALOG}.{SCHEMA}.margin_grooming_agent_llm"
-SCORE_FUNCTION = f"{CATALOG}.{SCHEMA}.margin_score_onnet_move"
-CM_METRIC_VIEW = f"{CATALOG}._metrics.margin_ledger_mv"
-MLFLOW_EXPERIMENT_ID = "1235449331932066"
-MARGIN_GENIE_SPACE_ID = "01f1df115a08164aab3ae5f6faac807c"  # Lakelink Fiber Margin Genie (P3-MARGIN-GENIE)
-APPROVAL_DB_HOST = "ep-calm-king-d2mq878u.database.us-east-1.cloud.databricks.com"  # Lakebase project telco-margin-analysis-app
+import os as _os, sys as _sys
+_d = _os.path.dirname(_os.path.abspath(__file__)) if "__file__" in globals() else _os.getcwd()
+while not _os.path.isfile(_os.path.join(_d, "src", "project_config.py")) and _os.path.dirname(_d) != _d:
+    _d = _os.path.dirname(_d)
+_sys.path.insert(0, _os.path.join(_d, "src"))
+from project_config import cfg, fq  # noqa: E402
+
+CATALOG = cfg("catalog")
+SCHEMA = cfg("schema")
+GATEWAY_SERVICE = cfg("gateway_service")
+SCORE_FUNCTION = fq("margin_score_onnet_move")
+CM_METRIC_VIEW = fq("margin_ledger_mv")
+MLFLOW_EXPERIMENT_ID = str(cfg("mlflow_experiment_id"))
+MARGIN_GENIE_SPACE_ID = cfg("genie_space_id")  # Margin Genie (P3-MARGIN-GENIE)
+APPROVAL_DB_HOST = cfg("app_lakebase_host")  # Lakebase app project (cfg('app_lakebase_endpoint'))
 
 SYSTEM_PROMPT = """You are the Lakelink Fiber off-net grooming agent.
 Goal: find off-net circuits that run next to Lakelink Fiber's own fiber and draft a savings
@@ -49,7 +57,7 @@ TOOLS = [
         "function": {
             "name": "ask_margin_genie",
             "description": (
-                "Ask Margin Genie (Genie Agent over cdm_tmforum._metrics.margin_ledger_mv) a natural-language "
+                f"Ask Margin Genie (Genie Agent over {CM_METRIC_VIEW}) a natural-language "
                 "question. This is the ONLY source of contribution margin, revenue, network expense and cost to "
                 "serve. Example: 'Which off-net circuits run next to our own fiber, and what do we pay for them?'"
             ),
@@ -65,7 +73,7 @@ TOOLS = [
         "function": {
             "name": "score_onnet_move",
             "description": (
-                "Calls UC function cdm_tmforum.revenue_assurance.margin_score_onnet_move(circuit_id BIGINT). "
+                f"Calls UC function {SCORE_FUNCTION}(circuit_id BIGINT). "
                 "Returns circuit_id, vendor_id, is_parallel_to_onnet_fiber, onnet_distance_m, "
                 "monthly_offnet_cost_usd, est_monthly_savings_usd, score (0-100). Pass NULL to score all off-net circuits."
             ),
@@ -82,7 +90,7 @@ TOOLS = [
             "name": "draft_savings_ticket",
             "description": (
                 "Insert a DRAFT savings ticket into the Margin Truth app approval queue "
-                "(Lakebase telco-margin-analysis-app public.approval_tickets, ticket_type='offnet_grooming', "
+                "(Lakebase app database public.approval_tickets, ticket_type='offnet_grooming', "
                 "approver_role='Ops') plus an approval_audit row with action='created'. Values must be copied from score_onnet_move."
             ),
             "parameters": {

@@ -17,7 +17,7 @@ resources:
         pause_status: UNPAUSED
       email_notifications:
         on_failure:
-          - stephen.hage@databricks.com
+          - ${var.alert_email}
       environments:
         - environment_key: stall_env
           spec:

@@ -21,6 +21,15 @@ targets:
           channel: CURRENT
           photon: true
           continuous: false
+          # Names read by pipeline/margin_truth_pipeline.sql as ${catalog}, ${schema}, ${volume_path} ...
+          # Values come from ../project_config.yml (the ONE place to change them).
+          configuration:
+            catalog: ${var.catalog}
+            schema: ${var.schema}
+            metrics_schema: ${var.metrics_schema}
+            documents_volume: ${var.documents_volume}
+            project_tag_key: ${var.project_tag_key}
+            project_tag: ${var.project_tag}
           libraries:
             - file:
                 path: ../../pipeline/margin_truth_pipeline.sql

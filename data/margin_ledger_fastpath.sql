@@ -1,12 +1,12 @@
 -- Lakelink Fiber Margin Truth: gold margin_ledger, SQL fast path (DEC-008), P1-LEDGER-GOLD-FASTPATH + DA-REQ-LEDGER-DRIVER-COLS
 -- Owner @data-engineer, built 2026-11-13. Contract: src/semantics/STANDARDS.md v1.0 plus driver columns.
--- Grain: customer x product x circuit x month (one row per margin_billing row). Target: cdm_tmforum.revenue_assurance.margin_ledger
+-- Grain: customer x product x circuit x month (one row per margin_billing row). Target: ${catalog}.${schema}.margin_ledger
 -- Network rule (note 182): on-net = contract_rate_usd x 0.25 strategic / 0.60 legacy; off-net = carrier paid_amount_usd.
 -- cost_to_serve_usd = baseline with active margin_allocation_rules (MGN-ALR-v1); live changes go through margin_ledger_allocated.
 -- ticket_count is a SYNTHETIC deterministic proxy (tmf_enterprise.ra_trouble_ticket has only 87 matched tickets in window).
 -- Table DDL with column comments was run once; reload with the INSERT OVERWRITE below.
 
-INSERT OVERWRITE cdm_tmforum.revenue_assurance.margin_ledger
+INSERT OVERWRITE ${catalog}.${schema}.margin_ledger
 WITH base AS (
   SELECT b.billing_month AS ledger_month, b.customer_id, k.product_id, b.circuit_id, b.contract_id,
          c.vendor_id, c.is_on_net, p.product_family, p.family_class, u.segment, u.region,
@@ -20,12 +20,12 @@ WITH base AS (
          CAST(c.bandwidth_mbps AS DECIMAL(12,2)) AS bandwidth_mbps,
          CAST(CASE WHEN p.family_class = 'legacy' THEN floor(pmod(xxhash64(b.circuit_id, b.billing_month), 1000) / 250)
                    ELSE CASE WHEN pmod(xxhash64(b.circuit_id, b.billing_month), 100) < 25 THEN 1 ELSE 0 END END AS INT) AS ticket_count
-  FROM cdm_tmforum.revenue_assurance.margin_billing b
-  JOIN cdm_tmforum.revenue_assurance.margin_circuits c ON c.circuit_id = b.circuit_id
-  JOIN cdm_tmforum.revenue_assurance.margin_contracts k ON k.contract_id = b.contract_id
-  JOIN cdm_tmforum.revenue_assurance.margin_products p ON p.product_id = k.product_id
-  JOIN cdm_tmforum.revenue_assurance.margin_customers u ON u.customer_id = b.customer_id
-  LEFT JOIN cdm_tmforum.revenue_assurance.margin_carrier_invoices ci
+  FROM ${catalog}.${schema}.margin_billing b
+  JOIN ${catalog}.${schema}.margin_circuits c ON c.circuit_id = b.circuit_id
+  JOIN ${catalog}.${schema}.margin_contracts k ON k.contract_id = b.contract_id
+  JOIN ${catalog}.${schema}.margin_products p ON p.product_id = k.product_id
+  JOIN ${catalog}.${schema}.margin_customers u ON u.customer_id = b.customer_id
+  LEFT JOIN ${catalog}.${schema}.margin_carrier_invoices ci
     ON ci.circuit_id = b.circuit_id AND ci.invoice_month = b.billing_month
 ),
 tot AS (
@@ -34,8 +34,8 @@ tot AS (
 ),
 pools AS (
   SELECT g.period_month AS ledger_month, r.driver, SUM(g.amount_usd * r.weight) AS amt
-  FROM cdm_tmforum.revenue_assurance.margin_gl_actuals g
-  JOIN cdm_tmforum.revenue_assurance.margin_allocation_rules r
+  FROM ${catalog}.${schema}.margin_gl_actuals g
+  JOIN ${catalog}.${schema}.margin_allocation_rules r
     ON r.cost_pool = g.cost_pool AND r.is_active AND g.period_month >= r.effective_from
    AND (r.effective_to IS NULL OR g.period_month <= r.effective_to)
   WHERE g.account_class = 'cost_to_serve_pool'

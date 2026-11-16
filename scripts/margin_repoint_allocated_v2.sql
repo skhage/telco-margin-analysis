@@ -1,11 +1,11 @@
 -- Lakelink Fiber Margin Truth: DE-REPOINT-ALLOCATED-V2 (DEC-023), @data-engineer 2026-11-13
 -- Repoints the live-allocation view margin_ledger_allocated from the SQL fast-path table
--- margin_ledger (DEC-008) to the SDP pipeline gold margin_ledger_v2 (pipeline 20960984-a9d3-46f4-826a-6301155bc79a).
--- Columns, column comments and the telco_project tag are unchanged. Only the 3 FROM references and two comments differ.
+-- margin_ledger (DEC-008) to the SDP pipeline gold margin_ledger_v2 (pipeline ${pipeline_id}).
+-- Columns, column comments and the ${project_tag_key} tag are unchanged. Only the 3 FROM references and two comments differ.
 -- Rollback: re-run with margin_ledger_v2 -> margin_ledger in the three FROM clauses.
--- Verified after apply: MEASURE(contribution_margin) on cdm_tmforum._metrics.margin_ledger_mv = 2,375,095,705.09 (unchanged).
+-- Verified after apply: MEASURE(contribution_margin) on ${catalog}.${metrics_schema}.margin_ledger_mv = 2,375,095,705.09 (unchanged).
 
-CREATE OR REPLACE VIEW cdm_tmforum.revenue_assurance.margin_ledger_allocated (
+CREATE OR REPLACE VIEW ${catalog}.${schema}.margin_ledger_allocated (
   ledger_month COMMENT 'Ledger month, first day of the month. Part of the primary key. Synonyms: month, period, fiscal month.',
   customer_id COMMENT 'Lakelink Fiber customer (TMF customer id). Part of the primary key; references margin_customers. Synonyms: account, customer number.',
   product_id COMMENT 'Product of the contract line (Salesforce product2 Id or MGN-PRD- synthetic legacy voice id). Part of the primary key; references margin_products. Synonyms: product, sku.',
@@ -29,26 +29,26 @@ CREATE OR REPLACE VIEW cdm_tmforum.revenue_assurance.margin_ledger_allocated (
   allocation_rule_version COMMENT 'Rule-set version the stored baseline ledger was built with (MGN-ALR-v1). The live cost_to_serve_usd in this view always uses the CURRENT active weights in margin_allocation_rules, so it can differ from this baseline after a rule change.',
   origin COMMENT 'Data origin: MIXED (real Salesforce/TMF keys with synthetic amounts and drivers).',
   source_system COMMENT 'Build that produced the row: margin_truth_pipeline SDP gold margin_ledger_v2 (DEC-023 repoint; replaced the DEC-008 SQL fast path).')
-COMMENT 'Lakelink Fiber margin ledger with LIVE cost-to-serve allocation. Grain: customer x product x circuit x contract x month (reads SDP gold margin_ledger_v2, same rows and columns as the margin_ledger fast path, STANDARDS v1.0). cost_to_serve_usd is recomputed at query time from margin_gl_actuals cost-to-serve pools and the active weights in margin_allocation_rules, so an allocation rule change flows to every answer immediately (demo scene 3). Source for metric view cdm_tmforum._metrics.margin_ledger_mv; for margin answers use that metric view (contribution margin is defined only there, DEC-002). Synonyms: allocated margin ledger, live ledger.'
-TBLPROPERTIES ('telco_project' = 'margin_analysis')
+COMMENT 'Lakelink Fiber margin ledger with LIVE cost-to-serve allocation. Grain: customer x product x circuit x contract x month (reads SDP gold margin_ledger_v2, same rows and columns as the margin_ledger fast path, STANDARDS v1.0). cost_to_serve_usd is recomputed at query time from margin_gl_actuals cost-to-serve pools and the active weights in margin_allocation_rules, so an allocation rule change flows to every answer immediately (demo scene 3). Source for metric view ${catalog}.${metrics_schema}.margin_ledger_mv; for margin answers use that metric view (contribution margin is defined only there, DEC-002). Synonyms: allocated margin ledger, live ledger.'
+TBLPROPERTIES ('${project_tag_key}' = '${project_tag}')
 WITH SCHEMA COMPENSATION
 AS WITH active_rules AS (
   SELECT m.ledger_month, r.cost_pool, r.driver, r.weight
-  FROM (SELECT DISTINCT ledger_month FROM cdm_tmforum.revenue_assurance.margin_ledger_v2) m
-  JOIN cdm_tmforum.revenue_assurance.margin_allocation_rules r
+  FROM (SELECT DISTINCT ledger_month FROM ${catalog}.${schema}.margin_ledger_v2) m
+  JOIN ${catalog}.${schema}.margin_allocation_rules r
     ON r.is_active AND m.ledger_month >= r.effective_from
    AND m.ledger_month <= COALESCE(r.effective_to, DATE'9999-12-31')
 ),
 pools AS (
   SELECT period_month AS ledger_month, cost_pool, SUM(amount_usd) AS pool_usd
-  FROM cdm_tmforum.revenue_assurance.margin_gl_actuals
+  FROM ${catalog}.${schema}.margin_gl_actuals
   WHERE account_class = 'cost_to_serve_pool' GROUP BY 1,2
 ),
 driver_totals AS (
   SELECT ledger_month,
          SUM(circuit_count) AS t_circuit_count, SUM(bandwidth_mbps) AS t_bandwidth_mbps,
          SUM(ticket_count) AS t_ticket_count, SUM(billed_revenue_usd) AS t_billed_revenue
-  FROM cdm_tmforum.revenue_assurance.margin_ledger_v2 GROUP BY 1
+  FROM ${catalog}.${schema}.margin_ledger_v2 GROUP BY 1
 ),
 coef AS (
   SELECT a.ledger_month,
@@ -68,5 +68,5 @@ SELECT l.ledger_month, l.customer_id, l.product_id, l.circuit_id, l.contract_id,
           + l.ticket_count*c.k_ticket_count + CAST(l.billed_revenue_usd AS DOUBLE)*c.k_billed_revenue, 0), 2) AS DECIMAL(18,2)) AS cost_to_serve_usd,
        l.expected_revenue_usd, l.carrier_rate_variance_usd, l.circuit_count, l.bandwidth_mbps, l.ticket_count,
        l.billed_revenue_usd, l.allocation_rule_version, l.origin, l.source_system
-FROM cdm_tmforum.revenue_assurance.margin_ledger_v2 l
+FROM ${catalog}.${schema}.margin_ledger_v2 l
 LEFT JOIN coef c ON c.ledger_month = l.ledger_month;

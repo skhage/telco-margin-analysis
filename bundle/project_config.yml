@@ -1,0 +1,411 @@
+# =====================================================================================================
+# Lakelink Fiber Margin Truth (telco-margin-analysis) - PROJECT CONFIG: the ONE place to change names.
+# =====================================================================================================
+# WHO READS THIS FILE
+#   * Declarative Automation Bundle: bundle/databricks.yml `include`s this file, so every entry is a
+#     bundle variable (${var.<name>}). Override per target or with `databricks bundle deploy --var name=value`.
+#   * Python (agents, jobs, tests, scripts): src/project_config.py  -> cfg("catalog"), fq("margin_ledger") ...
+#   * SQL files run by jobs (sql_task): {{catalog}} / {{schema}} / {{metrics_schema}} task parameters.
+#   * SDP pipeline SQL: ${catalog} / ${schema} / ... from the pipeline `configuration` block.
+#   * Metric view YAML (src/metric_views): ${catalog} etc., substituted by deploy_metric_views.py.
+#   * Databricks App: env vars in margin_app.app.yml / app.yaml, filled from these variables.
+#   * Dashboard + Margin Genie (cannot read variables): scripts/sync_config_surfaces.py rewrites their
+#     catalog.schema.object names, the embedded Genie space id and the Genie warehouse from this file.
+#     Check: `python scripts/sync_config_surfaces.py`   Apply: `... --apply [--publish]`. See `config_surfaces`.
+#
+# HOW TO DEPLOY IN A NEW WORKSPACE
+#   1. For each entry, read its description + `discovery` hints and find the matching object in your
+#      workspace (an agent can do this: search Unity Catalog for tables with the listed grain/columns).
+#   2. Change only the `default:` values here. Nothing else in the repo should need editing.
+#   3. Run `databricks bundle validate --strict` from bundle/.
+#   4. Run `python scripts/sync_config_surfaces.py --apply --publish` to re-point the dashboard and Genie.
+#
+# RULES (DAB variable format): only `description`, `default`, `type`, `lookup` keys are allowed per
+# variable. Object-valued variables use `type: complex`. Keep each description self-contained.
+# =====================================================================================================
+
+variables:
+
+  # ---------------------------------------------------------------------------------------------
+  # Unity Catalog locations
+  # ---------------------------------------------------------------------------------------------
+  catalog:
+    description: >-
+      Existing Unity Catalog catalog that holds every project object. This bundle never creates
+      catalogs. Discovery: a catalog where you can CREATE TABLE / CREATE FUNCTION and that contains
+      (or can contain) the project schema and metrics schema below. In the reference workspace this is
+      a TM Forum SID-aligned telco data model catalog.
+    default: cdm_tmforum
+
+  schema:
+    description: >-
+      Existing schema for all margin_ tables, UC functions, the SDP pipeline outputs, and the
+      documents volume. Never created by the bundle. Discovery: the schema where the margin_ ledger,
+      billing, circuits and contracts tables live (or should be built).
+    default: revenue_assurance
+
+  metrics_schema:
+    description: >-
+      Existing schema for the margin_ Unity Catalog metric views (contribution margin is defined only
+      in margin_ledger_mv). Never created by the bundle. Discovery: the schema that holds certified
+      metric views (table_type METRIC_VIEW in information_schema.tables).
+    default: _metrics
+
+  salesforce_schema:
+    description: >-
+      Read-only CRM source schema (Salesforce replica) used by the synthetic data builders for real keys:
+      account, contract, contract_line_item, product2, partner_account. Discovery: schema with a
+      Salesforce-style `account` table (Id, Name, ParentId) and `contract_line_item`.
+    default: salesforce_source
+
+  erp_schema:
+    description: >-
+      Read-only ERP / general-ledger source schema (Oracle ERP replica) used for GL actuals and the GL
+      tie-out check. Discovery: schema with GL journal / account-period balance tables.
+    default: oracle_erp_source
+
+  tmf_service_schema:
+    description: >-
+      Read-only TM Forum service-inventory schema. customer_facing_service supplies real circuit ids.
+      Discovery: schema containing a `customer_facing_service` table (one row per customer circuit).
+    default: tmf_service
+
+  documents_volume:
+    description: >-
+      Existing UC volume inside <catalog>.<schema> holding carrier invoice PDFs (sub-folder
+      carrier_invoices/) and demo artifacts (recordings/, rehearsal/). Path =
+      /Volumes/<catalog>/<schema>/<documents_volume>/. The SDP bronze table Auto Loads from
+      <volume>/carrier_invoices/. Discovery: a volume with *_CKT-<circuit_id>.pdf invoice files.
+    default: margin_documents
+
+  # ---------------------------------------------------------------------------------------------
+  # Tables, views, and functions (all in ${catalog}.${schema} unless `schema_key` says otherwise)
+  # Each entry: name (object name), schema_key (which schema variable above), kind, description,
+  # discovery (how an agent can find the equivalent object in another workspace).
+  # ---------------------------------------------------------------------------------------------
+  objects:
+    type: complex
+    description: >-
+      Map of logical object key -> {name, schema_key, kind, description, discovery}. Code refers to the
+      logical key (e.g. fq('margin_ledger')); change `name`/`schema_key` here to re-point it.
+    default:
+      margin_customers:
+        name: margin_customers
+        schema_key: schema
+        kind: table
+        description: Customer dimension for margin analysis. PK customer_id (TMF customer id) with segment and region.
+        discovery: One row per customer; columns customer_id, segment (Strategic Enterprise/Enterprise/Commercial/Small Business), region.
+      margin_products:
+        name: margin_products
+        schema_key: schema
+        kind: table
+        description: Product dimension. PK product_id (Salesforce product2 Id or MGN-PRD- synthetic id); product_family, family_class (legacy/strategic), margin_floor_pct.
+        discovery: One row per sellable product with a product family and a minimum-margin floor.
+      margin_contracts:
+        name: margin_contracts
+        schema_key: schema
+        kind: table
+        description: Contract lines (one product for one customer under one agreement). PK contract_id (Salesforce contract_line_item Id); contract_rate_usd, product_id.
+        discovery: Contract line items with a monthly contracted rate, keyed to customer and product.
+      margin_circuits:
+        name: margin_circuits
+        schema_key: schema
+        kind: table
+        description: Circuit dimension. PK circuit_id (TMF customer facing service id); is_on_net, vendor_id, bandwidth_mbps, onnet_distance_m, is_parallel_to_onnet_fiber.
+        discovery: One row per customer circuit with on-net/off-net flag, carrier (vendor) and bandwidth.
+      margin_vendors:
+        name: margin_vendors
+        schema_key: schema
+        kind: table
+        description: Third-party carriers that off-net circuits ride. PK vendor_id (Salesforce partner_account Id); vendor_name.
+        discovery: Carrier / supplier master keyed by partner account id.
+      margin_billing:
+        name: margin_billing
+        schema_key: schema
+        kind: table
+        description: Monthly billing per circuit. billing_month, customer_id, circuit_id, contract_id, billed_amount_usd, expected_amount_usd (expected minus billed = revenue leakage).
+        discovery: Grain circuit x month; billed and expected amounts in USD.
+      margin_carrier_invoices:
+        name: margin_carrier_invoices
+        schema_key: schema
+        kind: table
+        description: Monthly carrier invoices for off-net circuits. circuit_id, invoice_month, invoiced_rate_usd, vendor_contract_rate_usd, paid_amount_usd, source_pdf_path.
+        discovery: Grain off-net circuit x month; what the carrier billed vs the agreed rate vs what was paid.
+      margin_gl_actuals:
+        name: margin_gl_actuals
+        schema_key: schema
+        kind: table
+        description: General-ledger actuals by cost pool and month. period_month, cost_pool, account_class ('cost_to_serve_pool' rows feed allocation), amount_usd.
+        discovery: GL actuals aggregated to cost pool x month.
+      margin_allocation_rules:
+        name: margin_allocation_rules
+        schema_key: schema
+        kind: table
+        description: Cost-to-serve allocation rules. cost_pool, driver (circuit_count/bandwidth_mbps/ticket_count/billed_revenue), weight, is_active, effective_from, effective_to. A rule change moves every margin answer.
+        discovery: Rule table mapping a cost pool to an allocation driver with a weight and effective dates.
+      margin_ledger:
+        name: margin_ledger
+        schema_key: schema
+        kind: table
+        description: Fast-path gold margin ledger (SQL build, data/margin_ledger_fastpath.sql). Grain customer x product x circuit x month. Do not SUM raw columns for answers; use margin_ledger_mv.
+        discovery: Ledger with revenue_usd, network_expense_usd, cost_to_serve_usd per customer/product/circuit/month.
+      margin_ledger_v2:
+        name: margin_ledger_v2
+        schema_key: schema
+        kind: table
+        description: Pipeline-built gold margin ledger (SDP materialized view, pipeline/margin_truth_pipeline.sql). Same schema and logic as margin_ledger.
+        discovery: Output of the margin SDP pipeline; same grain as margin_ledger.
+      margin_ledger_allocated:
+        name: margin_ledger_allocated
+        schema_key: schema
+        kind: view
+        description: Ledger with cost to serve re-allocated at query time from the active margin_allocation_rules. Source of margin_ledger_mv.
+        discovery: View over the gold ledger that applies the current allocation rules.
+      margin_bronze_invoice_docs:
+        name: margin_bronze_invoice_docs
+        schema_key: schema
+        kind: streaming_table
+        description: SDP bronze. Raw carrier invoice PDFs Auto Loaded (binaryFile) from the documents volume.
+        discovery: Created by the pipeline; no equivalent needed in a new workspace.
+      margin_silver_invoice_parsed:
+        name: margin_silver_invoice_parsed
+        schema_key: schema
+        kind: materialized_view
+        description: SDP silver. ai_parse_document + ai_extract fields per invoice PDF.
+        discovery: Created by the pipeline; no equivalent needed in a new workspace.
+      margin_sales_territory:
+        name: margin_sales_territory
+        schema_key: schema
+        kind: table
+        description: Sales-rep to customer territory mapping used by the Sales row filter.
+        discovery: Mapping of user/group to customer_id they own.
+      margin_sales_can_see:
+        name: margin_sales_can_see
+        schema_key: schema
+        kind: function
+        description: Helper UC function for the Sales own-accounts row filter (scripts/margin_sales_row_filters.sql).
+        discovery: Created by the repo script.
+      margin_sales_row_filter:
+        name: margin_sales_row_filter
+        schema_key: schema
+        kind: function
+        description: Row-filter UC function ON (customer_id) applied to ledger, customers and contracts. Non-Sales principals are unfiltered.
+        discovery: Created by scripts/margin_sales_row_filters.sql.
+      margin_dq_gl_tieout:
+        name: margin_dq_gl_tieout
+        schema_key: schema
+        kind: view
+        description: Data-quality view that ties the ledger out to GL actuals (scripts/margin_dq_gl_tieout.sql).
+        discovery: Created by the repo script.
+      margin_score_onnet_move:
+        name: margin_score_onnet_move
+        schema_key: schema
+        kind: function
+        description: Table UC function (circuit_id BIGINT or NULL) scoring off-net circuits for grooming onto own fiber; returns monthly_offnet_cost_usd, est_monthly_savings_usd, score. Agent tool.
+        discovery: Created by agents/margin_score_onnet_move.sql (job lakelink-margin-functions).
+      margin_compare_rates:
+        name: margin_compare_rates
+        schema_key: schema
+        kind: function
+        description: UC function comparing carrier invoiced rate with the contracted vendor rate. Agent tool.
+        discovery: Created by agents/margin_compare_rates.sql (job lakelink-margin-functions).
+      # ---- metric views (schema_key: metrics_schema) ----
+      margin_ledger_mv:
+        name: margin_ledger_mv
+        schema_key: metrics_schema
+        kind: metric_view
+        description: Certified contribution margin metric view (revenue - network expense - cost to serve, DEC-002). Every surface reads MEASURE(contribution_margin) from here.
+        discovery: Deployed from src/metric_views/margin_ledger_mv.yaml.
+      margin_offnet_spend_mv:
+        name: margin_offnet_spend_mv
+        schema_key: metrics_schema
+        kind: metric_view
+        description: Off-net spend and grooming candidates (is_grooming_candidate, candidate_monthly_cost, est_annual_savings).
+        discovery: Deployed from src/metric_views/margin_offnet_spend_mv.yaml.
+      margin_segment_growth_mv:
+        name: margin_segment_growth_mv
+        schema_key: metrics_schema
+        kind: metric_view
+        description: Segment growth metric view.
+        discovery: Deployed from src/metric_views/margin_segment_growth_mv.yaml.
+      margin_renewal_floor_mv:
+        name: margin_renewal_floor_mv
+        schema_key: metrics_schema
+        kind: metric_view
+        description: Renewals below product margin floor metric view.
+        discovery: Deployed from src/metric_views/margin_renewal_floor_mv.yaml.
+      margin_onebillion_wall_mv:
+        name: margin_onebillion_wall_mv
+        schema_key: metrics_schema
+        kind: metric_view
+        description: $1B Wall metric view for the CFO scorecard.
+        discovery: Deployed from src/metric_views/margin_onebillion_wall_mv.yaml.
+      margin_rate_variance_mv:
+        name: margin_rate_variance_mv
+        schema_key: metrics_schema
+        kind: metric_view
+        description: Carrier rate variance metric view (stretch scope, not deployed by default).
+        discovery: Deployed from src/metric_views/margin_rate_variance_mv.yaml.
+      # ---- read-only sources ----
+      sf_account:
+        name: account
+        schema_key: salesforce_schema
+        kind: source_table
+        description: Salesforce accounts (real customer keys).
+        discovery: CRM account table with Id, Name, ParentId.
+      sf_contract:
+        name: contract
+        schema_key: salesforce_schema
+        kind: source_table
+        description: Salesforce contracts.
+        discovery: CRM contract header table.
+      sf_contract_line_item:
+        name: contract_line_item
+        schema_key: salesforce_schema
+        kind: source_table
+        description: Salesforce contract line items (keys for margin_contracts).
+        discovery: CRM contract line table linking contract, product and account.
+      sf_product2:
+        name: product2
+        schema_key: salesforce_schema
+        kind: source_table
+        description: Salesforce product catalog (keys for margin_products).
+        discovery: CRM product master (Id, Name, Family).
+      sf_partner_account:
+        name: partner_account
+        schema_key: salesforce_schema
+        kind: source_table
+        description: Salesforce partner accounts (keys for margin_vendors).
+        discovery: CRM partner / carrier account table.
+      tmf_customer_facing_service:
+        name: customer_facing_service
+        schema_key: tmf_service_schema
+        kind: source_table
+        description: TMF customer facing services (real circuit ids for margin_circuits).
+        discovery: Service inventory table, one row per customer circuit.
+
+  # ---------------------------------------------------------------------------------------------
+  # Compute and AI
+  # ---------------------------------------------------------------------------------------------
+  warehouse_name:
+    description: >-
+      Display name of the SQL warehouse used by the app, UC function job, dashboard and agent.
+      Python resolves the id from this name (src/project_config.py warehouse_id()). If you change it,
+      also change the `lookup.warehouse` value of warehouse_id below (bundle lookups cannot use variables).
+    default: telco_cdm_model
+
+  warehouse_id:
+    description: SQL warehouse id, resolved by the bundle from the warehouse name (keep equal to warehouse_name).
+    lookup:
+      warehouse: telco_cdm_model
+
+  gateway_service:
+    description: >-
+      Unity Gateway model service (catalog.schema.service) the grooming agent calls, with guardrails on.
+      Discovery: a chat model service you have EXECUTE on. Default lives in <catalog>.<schema>.
+    default: cdm_tmforum.revenue_assurance.margin_grooming_agent_llm
+
+  gateway_backing_model:
+    description: Foundation model behind the gateway service (agents/gateway_sp_tracing_setup.py). Any system.ai chat model.
+    default: system.ai.databricks-claude-sonnet-4-5
+
+  gateway_fallback_model:
+    description: Fallback / fast model for the gateway service.
+    default: system.ai.claude-haiku-5-5
+
+  # ---------------------------------------------------------------------------------------------
+  # Workspace assets (ids are workspace-specific: set after you create or import them)
+  # ---------------------------------------------------------------------------------------------
+  genie_space_id:
+    description: Margin Genie agent (space) id. Leave empty in a new workspace until the space is created; the agent then uses its SQL stand-in.
+    default: 01f1df115a08164aab3ae5f6faac807c
+
+  dashboard_id:
+    description: Live AI/BI dashboard 'Lakelink Fiber Margin Truth' uuid (for bundle bind).
+    default: 01f1df1950c51bd68e87ace31632c2bf
+
+  pipeline_id:
+    description: Live SDP pipeline 'Lakelink Fiber Margin Truth Pipeline' id (for bundle bind).
+    default: 20960984-a9d3-46f4-826a-6301155bc79a
+
+  mlflow_experiment_id:
+    description: MLflow experiment id for grooming agent traces (agents/margin_grooming_agent_traces).
+    default: "1235449331932066"
+
+  glossary_domain_id:
+    description: UC Glossary domain id that holds the margin glossary pages (src/semantics/glossary_pages.json).
+    default: 2abc9194-aed9-4088-bfa6-4b4d33870ebd
+
+  app_name:
+    description: Databricks App name (approval queue + margin explorer).
+    default: lakelink-margin-truth
+
+  agent_name:
+    description: Grooming agent name / intended service principal name.
+    default: lakelink-margin-grooming-agent
+
+  # ---------------------------------------------------------------------------------------------
+  # Lakebase (Postgres) projects
+  # ---------------------------------------------------------------------------------------------
+  app_lakebase_endpoint:
+    description: Lakebase endpoint of the app approval queue (tables public.approval_tickets, public.approval_audit).
+    default: projects/telco-margin-analysis-app/branches/production/endpoints/primary
+
+  app_lakebase_host:
+    description: Host of app_lakebase_endpoint (from `databricks postgres get-endpoint`).
+    default: ep-calm-king-d2mq878u.database.us-east-1.cloud.databricks.com
+
+  taskboard_lakebase_endpoint:
+    description: Lakebase endpoint of the agent swarm task board (agent_tasks, status_updates). Used by tests/stall_monitor.py.
+    default: projects/telco-margin-analysis-project/branches/production/endpoints/primary
+
+  taskboard_lakebase_host:
+    description: Host of taskboard_lakebase_endpoint.
+    default: ep-orange-lab-d2tt5nll.database.us-east-1.cloud.databricks.com
+
+  lakebase_database:
+    description: Postgres database name in both Lakebase projects.
+    default: databricks_postgres
+
+  # ---------------------------------------------------------------------------------------------
+  # Tags, branding, notifications
+  # ---------------------------------------------------------------------------------------------
+  project_tag_key:
+    description: Tag / TBLPROPERTIES key applied to every project asset.
+    default: telco_project
+
+  project_tag:
+    description: Value of the project tag.
+    default: margin_analysis
+
+  company_name:
+    description: Fictional company name shown in apps, prompts and comments.
+    default: Lakelink Fiber
+
+  alert_email:
+    description: Email for job on_failure notifications.
+    default: stephen.hage@databricks.com
+
+  # ---------------------------------------------------------------------------------------------
+  # Surfaces that cannot read variables - kept in sync by scripts/sync_config_surfaces.py
+  # ---------------------------------------------------------------------------------------------
+  config_surfaces:
+    type: complex
+    description: >-
+      Dashboard and Genie hold literal names. scripts/sync_config_surfaces.py rewrites every
+      <catalog>.<schema>.<object> whose object is a key or name in `objects` to the configured fully
+      qualified name, sets the dashboard's embedded Genie id to genie_space_id and the Genie warehouse
+      to warehouse_name. Default run = check only (exit 1 on drift). Documentation only; not read by code.
+    default:
+      - surface: dashboard (dashboard_id; draft file src/dashboards/Lakelink Fiber Margin Truth.lvdash.json)
+        reads: [margin_ledger_mv, margin_offnet_spend_mv, margin_onebillion_wall_mv, margin_renewal_floor_mv, margin_segment_growth_mv, genie_space_id]
+        sync: Lakeview API update of the draft; --publish publishes with embedded credentials.
+      - surface: src/dashboards/margin_truth_skeleton.json
+        reads: [margin metric views]
+        sync: File rewrite.
+      - surface: Margin Genie (genie_space_id; repo copy genie/margin_genie_space.serialized.json)
+        reads: [5 margin metric views, margin_circuits, margin_contracts, margin_products, margin_vendors, margin_score_onnet_move, warehouse_name]
+        sync: Genie API PATCH of serialized_space + warehouse_id (etag-guarded); tables re-sorted by identifier; repo copy rewritten.
+      - surface: genie/margin_genie_instructions.md
+        reads: [documentation copy of the Genie instructions]
+        sync: Not rewritten (prose); the live instructions are inside serialized_space and are rewritten.

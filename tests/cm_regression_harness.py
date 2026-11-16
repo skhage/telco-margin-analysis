@@ -4,7 +4,7 @@ Owner @qa. Expected values come from raw SQL over margin_ledger (tests/cm_baseli
 Tolerance: 0.00 USD at the product_family grain (exact to the cent), matching tests/cm_cross_surface_reconciliation.sql.
 
 Surfaces and how each is called:
-  1. metric_view - SQL Statement API: MEASURE(contribution_margin) FROM cdm_tmforum._metrics.margin_ledger_mv
+  1. metric_view - SQL Statement API: MEASURE(contribution_margin) FROM fq('margin_ledger_mv')
   2. genie       - Genie Conversation API (POST /api/2.0/genie/spaces/{space_id}/start-conversation), read the
                    query_result attachment. Needs MARGIN_GENIE_SPACE_ID (P3-MARGIN-GENIE).
   3. genie_one   - SKIPPED per DEC-029b (gate 5 expired Nov 14 18:05 UTC; Margin Genie only on stage, no Genie One
@@ -15,7 +15,16 @@ Surfaces and how each is called:
   6. agent       - Grooming agent Genie tool; checked via the MLflow trace span output once P4-GROOMING-AGENT is wired.
 A surface that is not built yet reports NOT_AVAILABLE (not PASS). The run fails on any MISMATCH.
 """
+import os
+import sys
 from decimal import Decimal
+
+# CONFIG: names come from bundle/project_config.yml via src/project_config.py.
+_d = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
+while not os.path.isfile(os.path.join(_d, "src", "project_config.py")) and os.path.dirname(_d) != _d:
+    _d = os.path.dirname(_d)
+sys.path.insert(0, os.path.join(_d, "src"))
+from project_config import fq, render  # noqa: E402
 
 TOLERANCE = Decimal("0.00")
 
@@ -66,14 +75,14 @@ EXPECTED_WALL_MV = {
     "Off-net grooming": Decimal("412539.96"),
 }
 WALL_MV_SQL = ("SELECT lever, CAST(MEASURE(identified_savings) AS DECIMAL(18,2)) AS v "
-               "FROM cdm_tmforum._metrics.margin_onebillion_wall_mv GROUP BY ALL")
-BASELINE_SQL_PATH = "/Workspace/Users/stephen.hage@databricks.com/telco-margin-analysis/tests/cm_baseline_expected.sql"
+               f"FROM {fq('margin_onebillion_wall_mv')} GROUP BY ALL")
+BASELINE_SQL_PATH = os.path.join(_d, "tests", "cm_baseline_expected.sql")
 
 
 def scene7_raw_sql(path=BASELINE_SQL_PATH):
     """Return statement (7) (the last statement) of cm_baseline_expected.sql with comment lines removed."""
     with open(path) as f:
-        text = f.read()
+        text = render(f.read())  # ${catalog}/${schema}/... tokens from project_config.yml
     # Drop comment lines BEFORE splitting: comments in section (7) contain ';'.
     code = "\n".join(l for l in text.splitlines() if not l.strip().startswith("--"))
     stmts = [s.strip() for s in code.split(";")]
@@ -90,15 +99,15 @@ def run_scene7(spark):
 GENIE_ONE_MANUAL = {}  # fill by hand during rehearsal
 
 MV_SQL = ("SELECT product_family, CAST(MEASURE(contribution_margin) AS DECIMAL(18,2)) AS cm "
-          "FROM cdm_tmforum._metrics.margin_ledger_mv GROUP BY ALL")
+          f"FROM {fq('margin_ledger_mv')} GROUP BY ALL")
 # Live-allocation view (DA-DE-LIVE-ALLOCATION-VIEW). Per-row ROUND(...,2) => +0.26 vs table total; tolerance $1 total, $10 per cell (note 280).
 ALLOC_SQL = ("SELECT product_family, CAST(SUM(revenue_usd - network_expense_usd - cost_to_serve_usd) AS DECIMAL(18,2)) AS cm "
-             "FROM cdm_tmforum.revenue_assurance.margin_ledger_allocated GROUP BY product_family")
+             f"FROM {fq('margin_ledger_allocated')} GROUP BY product_family")
 EXPECTED_ALLOC_TOTAL = Decimal("2375095705.09")
 ALLOC_TOL_CELL = Decimal("10.00")
 ALLOC_TOL_TOTAL = Decimal("1.00")
 REF_SQL = ("SELECT product_family, CAST(SUM(revenue_usd - network_expense_usd - cost_to_serve_usd) AS DECIMAL(18,2)) AS cm "
-           "FROM cdm_tmforum.revenue_assurance.margin_ledger GROUP BY product_family")
+           f"FROM {fq('margin_ledger')} GROUP BY product_family")
 
 
 def compare(surface, actual, expected=EXPECTED_FULL, tol=TOLERANCE):
@@ -155,5 +164,5 @@ def run(spark):
     return results
 
 
-# Pre-demo check (COO-Q-20261112-12 d): app Lakebase project telco-margin-analysis-app must return 0 rows for
+# Pre-demo check (COO-Q-20261112-12 d): app Lakebase project cfg('app_lakebase_endpoint') must return 0 rows for
 #   SELECT ticket_id FROM public.approval_tickets WHERE ticket_id LIKE 'TEST-GROOM-%'

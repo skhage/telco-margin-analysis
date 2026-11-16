@@ -1,10 +1,10 @@
 # Lakelink Fiber Margin Truth - metric view margin_renewal_floor_mv v1.0 (P2-MV-SUITE, @data-analyst, 2026-11-13)
-# Deployed to cdm_tmforum._metrics.margin_renewal_floor_mv (DEC-001, DEC-019). TBLPROPERTIES telco_project=margin_analysis.
+# Deployed to ${catalog}.${metrics_schema}.margin_renewal_floor_mv (DEC-001, DEC-019). TBLPROPERTIES ${project_tag_key}=${project_tag}.
 # Later edits: ALTER VIEW ... AS <body without these # lines>. Expected: renewals 1,377; below floor 586; CM 2,375,095,705.09.
 version: 1.1
 comment: >-
   Lakelink Fiber renewal margin-floor metrics. Grain: one row per contract line that has ledger activity.
-  Contribution margin and CM % come from MEASURE() over cdm_tmforum._metrics.margin_ledger_mv (DEC-002, DEC-020); they are not redefined here.
+  Contribution margin and CM % come from MEASURE() over ${catalog}.${metrics_schema}.margin_ledger_mv (DEC-002, DEC-020); they are not redefined here.
   Below floor = CM % < product margin_floor_pct. Renewal window = term_end within 90 days of the demo as-of date 2026-11-19 (DEC-019).
   Sales starter question: which renewals in the next 90 days are below the margin floor? Synonyms: renewals, margin floor, at-risk renewals.
 source: |-
@@ -13,12 +13,12 @@ source: |-
          cm.revenue_usd, cm.contribution_margin_usd, cm.cm_pct,
          (c.term_end BETWEEN DATE'2026-11-19' AND DATE'2026-11-19' + 90) AS is_renewal_next_90d,
          (cm.cm_pct < p.margin_floor_pct) AS is_below_floor
-  FROM cdm_tmforum.revenue_assurance.margin_contracts c
-  JOIN cdm_tmforum.revenue_assurance.margin_products p ON p.product_id = c.product_id
-  LEFT JOIN cdm_tmforum.revenue_assurance.margin_customers cu ON cu.customer_id = c.customer_id
+  FROM ${catalog}.${schema}.margin_contracts c
+  JOIN ${catalog}.${schema}.margin_products p ON p.product_id = c.product_id
+  LEFT JOIN ${catalog}.${schema}.margin_customers cu ON cu.customer_id = c.customer_id
   JOIN (SELECT contract_id, MEASURE(revenue) AS revenue_usd, MEASURE(contribution_margin) AS contribution_margin_usd,
                MEASURE(cm_pct) AS cm_pct
-        FROM cdm_tmforum._metrics.margin_ledger_mv GROUP BY contract_id) cm ON cm.contract_id = c.contract_id
+        FROM ${catalog}.${metrics_schema}.margin_ledger_mv GROUP BY contract_id) cm ON cm.contract_id = c.contract_id
 dimensions:
   - name: contract_id
     expr: contract_id

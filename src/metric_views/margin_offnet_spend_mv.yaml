@@ -1,12 +1,12 @@
 # Lakelink Fiber Margin Truth - metric view margin_offnet_spend_mv v1.0 (ML-MV-OFFNET-RATE, @ml-engineer, 2026-11-13)
-# Deploy target: cdm_tmforum._metrics.margin_offnet_spend_mv (DEC-001). NOT YET DEPLOYED: awaiting CEO confirmation of _metrics writes.
-# Deploy: CREATE VIEW ... WITH METRICS LANGUAGE YAML AS <dollar-quoted body without these # lines>; then SET TBLPROPERTIES ('telco_project'='margin_analysis').
+# Deploy target: ${catalog}.${metrics_schema}.margin_offnet_spend_mv (DEC-001). NOT YET DEPLOYED: awaiting CEO confirmation of _metrics writes.
+# Deploy: CREATE VIEW ... WITH METRICS LANGUAGE YAML AS <dollar-quoted body without these # lines>; then SET TBLPROPERTIES ('${project_tag_key}'='${project_tag}').
 # Later edits: ALTER VIEW ... AS <body>. Expected tests: offnet_circuit_count 17,427; grooming_candidate_count 47; heroes 45040 (879.34) and 98532 (469.00).
 version: 1.1
 comment: >-
   Lakelink Fiber off-net spend and grooming metrics. Grain: one row per off-net circuit (circuit rides a third-party vendor).
   Monthly cost is the latest carrier invoice paid amount; estimated savings and score come from the UC function
-  cdm_tmforum.revenue_assurance.margin_score_onnet_move, the same function the off-net grooming agent calls.
+  ${catalog}.${schema}.margin_score_onnet_move, the same function the off-net grooming agent calls.
   Ops starter question: which off-net circuits run next to our own fiber, and what do we pay for them?
   Contribution margin is NOT defined here; use margin_ledger_mv (DEC-002). Synonyms: grooming, off-net spend, vendor spend.
 source: |-
@@ -15,11 +15,11 @@ source: |-
          s.monthly_offnet_cost_usd, s.est_monthly_savings_usd, s.score,
          (s.is_parallel_to_onnet_fiber AND s.est_monthly_savings_usd > 0) AS is_grooming_candidate,
          ci.trailing_12m_paid_usd
-  FROM cdm_tmforum.revenue_assurance.margin_score_onnet_move(NULL) s
-  JOIN cdm_tmforum.revenue_assurance.margin_circuits c ON c.circuit_id = s.circuit_id
-  LEFT JOIN cdm_tmforum.revenue_assurance.margin_vendors v ON v.vendor_id = s.vendor_id
+  FROM ${catalog}.${schema}.margin_score_onnet_move(NULL) s
+  JOIN ${catalog}.${schema}.margin_circuits c ON c.circuit_id = s.circuit_id
+  LEFT JOIN ${catalog}.${schema}.margin_vendors v ON v.vendor_id = s.vendor_id
   LEFT JOIN (SELECT circuit_id, SUM(paid_amount_usd) AS trailing_12m_paid_usd
-             FROM cdm_tmforum.revenue_assurance.margin_carrier_invoices GROUP BY circuit_id) ci
+             FROM ${catalog}.${schema}.margin_carrier_invoices GROUP BY circuit_id) ci
          ON ci.circuit_id = s.circuit_id
 dimensions:
   - name: circuit_id

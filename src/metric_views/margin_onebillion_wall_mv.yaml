@@ -1,5 +1,5 @@
 # Lakelink Fiber Margin Truth - metric view margin_onebillion_wall_mv v1.0 (P2-MV-SUITE, @data-analyst, 2026-11-13)
-# Deployed to cdm_tmforum._metrics.margin_onebillion_wall_mv (DEC-001, DEC-022). TBLPROPERTIES telco_project=margin_analysis.
+# Deployed to ${catalog}.${metrics_schema}.margin_onebillion_wall_mv (DEC-001, DEC-022). TBLPROPERTIES ${project_tag_key}=${project_tag}.
 # Later edits: ALTER VIEW ... AS <body without these # lines>. Expected: identified 61,253,174.38; gap 938,746,825.62; baseline CM 2,375,095,705.09.
 version: 1.1
 comment: >-
@@ -10,25 +10,25 @@ comment: >-
   MEASURE(contribution_margin) in margin_ledger_mv (2,375,095,705.09 at default rules, DEC-020).
   Synonyms: $1B Wall, billion dollar wall, 1B wall, margin improvement target, levers.
 source: |-
-  WITH base AS (SELECT MEASURE(contribution_margin) AS baseline_cm FROM cdm_tmforum._metrics.margin_ledger_mv),
+  WITH base AS (SELECT MEASURE(contribution_margin) AS baseline_cm FROM ${catalog}.${metrics_schema}.margin_ledger_mv),
   levers AS (
     SELECT 1 AS lever_rank, 'Off-net grooming' AS lever, 'Ops' AS owner_persona, 'margin_offnet_spend_mv.est_annual_savings' AS source_metric,
-           MEASURE(est_annual_savings) AS identified_usd FROM cdm_tmforum._metrics.margin_offnet_spend_mv
+           MEASURE(est_annual_savings) AS identified_usd FROM ${catalog}.${metrics_schema}.margin_offnet_spend_mv
     UNION ALL
     SELECT 2, 'Revenue leakage recovery', 'Finance', 'margin_ledger_mv.revenue_leakage', MEASURE(revenue_leakage)
-    FROM cdm_tmforum._metrics.margin_ledger_mv
+    FROM ${catalog}.${metrics_schema}.margin_ledger_mv
     UNION ALL
     SELECT 3, 'Carrier rate variance recovery', 'Ops', 'margin_ledger_mv.carrier_rate_variance', MEASURE(carrier_rate_variance)
-    FROM cdm_tmforum._metrics.margin_ledger_mv
+    FROM ${catalog}.${metrics_schema}.margin_ledger_mv
     UNION ALL
     SELECT 4, 'Legacy repricing', 'Finance', 'margin_ledger_mv.contribution_margin (loss-making legacy families)', -SUM(cm)
-    FROM (SELECT product_family, MEASURE(contribution_margin) AS cm FROM cdm_tmforum._metrics.margin_ledger_mv
+    FROM (SELECT product_family, MEASURE(contribution_margin) AS cm FROM ${catalog}.${metrics_schema}.margin_ledger_mv
           WHERE family_class = 'legacy' GROUP BY product_family) WHERE cm < 0
     UNION ALL
     SELECT 5, 'Renewal margin floor', 'Sales', 'margin_renewal_floor_mv (floor gap x revenue, below-floor renewals)',
            SUM((margin_floor_pct - contract_cm_pct) * renewal_revenue)
     FROM (SELECT contract_id, margin_floor_pct, contract_cm_pct, MEASURE(renewal_revenue) AS renewal_revenue
-          FROM cdm_tmforum._metrics.margin_renewal_floor_mv WHERE is_renewal_next_90d AND is_below_floor GROUP BY ALL))
+          FROM ${catalog}.${metrics_schema}.margin_renewal_floor_mv WHERE is_renewal_next_90d AND is_below_floor GROUP BY ALL))
   SELECT l.lever_rank, l.lever, l.owner_persona, l.source_metric, CAST(l.identified_usd AS DECIMAL(18,2)) AS identified_usd,
          CAST(1000000000 AS DECIMAL(18,2)) AS wall_target_usd, b.baseline_cm
   FROM levers l CROSS JOIN base b

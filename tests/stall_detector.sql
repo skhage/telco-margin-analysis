@@ -1,4 +1,4 @@
--- Lakelink Fiber Margin Truth: swarm stall detector (Lakebase Postgres, telco-margin-analysis-project, public schema)
+-- Lakelink Fiber Margin Truth: swarm stall detector (Lakebase Postgres, task board cfg('taskboard_lakebase_endpoint'), public schema)
 -- Owner: @devops (DEVOPS-STALL-RCA). Run every @qa / @pm / @coo run.
 -- A role is STALLED when it has written nothing to the board for more than 3 hours.
 -- Activity = status_updates, agent_notes, asset_ledger rows by the role, tasks it assigned, tasks it completed.

@@ -1,13 +1,22 @@
 # Lakelink Fiber Margin Truth - synthetic PDF generator (P1-INVOICE-PDFS, @data-engineer 2026-11-13)
 # Writes 20 carrier invoice statements (one margin_carrier_invoices line each, Oct 2026: heroes 45040 + 98532,
 # 9 over-contract-rate lines, 9 at-contract lines) and 5 customer contract PDFs (margin_contracts) to
-# /Volumes/cdm_tmforum/revenue_assurance/margin_documents/{carrier_invoices,contracts}/ and links
+# volume_path() = /Volumes/<catalog>/<schema>/<documents_volume>/{carrier_invoices,contracts}/ and links
 # margin_carrier_invoices.source_pdf_path. Requires: %pip install fpdf2. origin=SYNTHETIC. telco_project=margin_analysis
+# CONFIG: names come from bundle/project_config.yml via src/project_config.py.
 from fpdf import FPDF
 import os
+import sys
 
-T = "cdm_tmforum.revenue_assurance."
-VOL = "/Volumes/cdm_tmforum/revenue_assurance/margin_documents"
+_d = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
+while not os.path.isfile(os.path.join(_d, "src", "project_config.py")) and os.path.dirname(_d) != _d:
+    _d = os.path.dirname(_d)
+sys.path.insert(0, os.path.join(_d, "src"))
+from project_config import cfg, schema_fq, volume_path  # noqa: E402
+
+T = schema_fq("schema") + "."
+VOL = volume_path().rstrip("/")
+COMPANY = cfg("company_name")
 NAVY = (27, 49, 57)
 
 SEL_SQL = f"""
@@ -55,7 +64,7 @@ def carrier_invoice_pdf(r):
         pdf.cell(wd, 8, f"{float(val):,.2f}", border=1, align="R")
     pdf.ln(12); _kv(pdf, "Total Amount Due (USD)", f"{float(r['paid_amount_usd']):,.2f}"); _kv(pdf, "Payment Terms", "Net 30")
     pdf.ln(6); pdf.set_font("Helvetica", "I", 8)
-    pdf.multi_cell(0, 5, "Synthetic carrier invoice for the Lakelink Fiber Margin Truth demo. Values mirror cdm_tmforum.revenue_assurance.margin_carrier_invoices.")
+    pdf.multi_cell(0, 5, "Synthetic carrier invoice for the Lakelink Fiber Margin Truth demo. Values mirror " + T + "margin_carrier_invoices.")
     p = f"{VOL}/carrier_invoices/{r['invoice_number']}_CKT-{r['circuit_id']}.pdf"
     os.makedirs(os.path.dirname(p), exist_ok=True); pdf.output(p); return p
 
@@ -70,7 +79,7 @@ def contract_pdf(r):
     pdf.ln(6); pdf.set_font("Helvetica", "", 10)
     pdf.multi_cell(0, 6, "Lakelink Fiber agrees to provide the service above to the Customer at the monthly contract rate for the stated term. Rates exclude taxes, usage and one-time charges.")
     pdf.ln(4); pdf.set_font("Helvetica", "I", 8)
-    pdf.multi_cell(0, 5, "Synthetic contract for the Lakelink Fiber Margin Truth demo. Values mirror cdm_tmforum.revenue_assurance.margin_contracts.")
+    pdf.multi_cell(0, 5, "Synthetic contract for the Lakelink Fiber Margin Truth demo. Values mirror " + T + "margin_contracts.")
     p = f"{VOL}/contracts/{r['contract_id']}_CKT-{r['circuit_id']}.pdf"
     os.makedirs(os.path.dirname(p), exist_ok=True); pdf.output(p); return p
 

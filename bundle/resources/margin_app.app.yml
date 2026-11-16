@@ -9,7 +9,7 @@ targets:
     resources:
       apps:
         margin_app:
-          name: lakelink-margin-truth
+          name: ${var.app_name}
           description: Lakelink Fiber Margin Truth - approval queue and margin explorer (telco_project=margin_analysis)
           source_code_path: ../../apps/margin-truth
           resources:

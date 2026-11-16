@@ -14,14 +14,16 @@
 #   margin_stall_monitor.job.yml     hourly swarm stall monitor over the Lakebase task board
 #   margin_metric_views.job.yml      deploys src/metric_views/*.yaml into ${var.metrics_schema} (dry run default)
 #   margin_synth_generator.job.yml   rebuilds margin_ synthetic tables + fast-path ledger (dry run default)
-#   margin_genie (Genie agent)       space 01f1df115a08164aab3ae5f6faac807c; config in ../genie (see README.md)
+#   margin_genie (Genie agent)       space id = var.genie_space_id (project_config.yml); config in ../genie
 # Deploy procedure (bind live assets first, jobs-only fallback): DEPLOY_RUNBOOK.md
 # Secrets and tokens are NEVER committed; use secret scopes or app resources.
 
 bundle:
   name: telco_margin_analysis
 
+# project_config.yml = the ONE place to change catalog/schema/table/asset names (documented, DAB variables).
 include:
+  - project_config.yml
   - resources/*.yml
 
 # Sources outside bundle/ that resources reference (app source, UC function SQL).
@@ -42,23 +44,8 @@ sync:
   exclude:
     - "../resources/projectplan.md"
 
-variables:
-  catalog:
-    description: Existing Unity Catalog catalog for all project assets.
-    default: cdm_tmforum
-  schema:
-    description: Existing schema for margin_ tables, UC functions, and the margin_documents volume.
-    default: revenue_assurance
-  metrics_schema:
-    description: Existing schema for margin_ metric views.
-    default: _metrics
-  project_tag:
-    description: Value for the telco_project tag applied to every project asset.
-    default: margin_analysis
-  warehouse_id:
-    description: SQL warehouse for the app, UC function job, and dashboard.
-    lookup:
-      warehouse: telco_cdm_model
+# All variables (catalog, schema, metrics_schema, project_tag, warehouse_id, ...) are defined and
+# documented in project_config.yml. Do not redefine them here.
 
 presets:
   tags:
