@@ -4,17 +4,15 @@ Scenes: 5 "From insight to action" (agents act, people approve) and 6 "Prove it 
 App: `lakelink-margin-truth`, which is the ONE app. Use this script live if gates 1+2 clear, or to record the DEC-018 fallback (cutoff Nov 15 12:00 CT).
 
 ## Fixed demo data (verified 2026-11-13 in app Lakebase `public.approval_tickets`)
-Exact cents are in this table. The currently deployed build (01f1df66) shows whole US dollars (`fmtUsd` with 0 decimals), so the storyboard quotes the values you will see on screen today.
+Exact cents are in this table. The build of record 01f1e1da (DEC-082) shows US dollars to 2 decimal places (DEC-030), so the storyboard quotes the exact cents you will see on screen. Values re-verified 2026-11-16 ~21:30 UTC in app Lakebase and against MEASURE() on `cdm_tmforum._metrics.margin_offnet_spend_mv` (diff 0.00).
 
 | Ticket | Type | Approver | Circuit | Vendor (name / ID) | Monthly cost | Est. monthly savings | On screen |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GROOM-44c3612b69 | offnet_grooming | Ops | 45040 | Partner Carrier 55 / 00100000000265pAAA | 2,880.05 | 879.34 | $2,880 / $879 |
-| GROOM-6d8f8ce31e | offnet_grooming | Ops | 98532 | Partner Carrier 47 / 00100000000265hAAA | 2,469.86 | 469.00 | $2,470 / $469 |
-| GROOM-1e655052ef (LIVE APPROVE TARGET, DEC-037a) | offnet_grooming | Ops | 10211 | Partner Carrier 28 / 00100000000264YAAA | 1,364.58 | 1,357.85 | $1,365 / $1,358 |
+| GROOM-44c3612b69 | offnet_grooming | Ops | 45040 | Partner Carrier 55 / 00100000000265pAAA | 2,880.05 | 879.34 | $2,880.05 / $879.34 |
+| GROOM-6d8f8ce31e | offnet_grooming | Ops | 98532 | Partner Carrier 47 / 00100000000265hAAA | 2,469.86 | 469.00 | $2,469.86 / $469.00 |
+| GROOM-1e655052ef (LIVE APPROVE TARGET, DEC-037a) | offnet_grooming | Ops | 10211 | Partner Carrier 28 / 00100000000264YAAA | 1,364.58 | 1,357.85 | $1,364.58 / $1,357.85 |
 
 Scene-5 pre-roll Ops queue = exactly 3 pending non-TEST tickets (DEC-037a, verified 2026-11-14 ~01:30 UTC in app Lakebase; values tie to MEASURE() on `cdm_tmforum._metrics.margin_offnet_spend_mv`, diff 0.00). The presenter approves GROOM-1e655052ef (circuit 10211) live; 45040 and 98532 stay pending. Scene 6 opens 10211's own trace tr-2b088edfed85d22b2db662a6c0a7c68e (real Margin Genie call + score_onnet_move + ticket INSERT).
-
-Note: the source formatter now shows 2 dp (QA-F-APP-CM-0DP, DEC-030). After the next redeploy the on-screen values become $2,880.05 / $879.34 and $2,469.86 / $469.00.
 
 Trace rule (APP-EVIDENCE-TRACE-FROM-TICKET): this script does NOT name a trace id. The evidence panel builds its "Open trace" link from the approved ticket's own `approval_tickets.trace_id` (server/index.ts: `ticket.trace_id`, else the `trace_id` in the agent's `created` audit row). Before recording, read the id with `SELECT ticket_id, trace_id FROM public.approval_tickets WHERE status='pending'` and open only that trace in scene 6.
 
@@ -32,14 +30,14 @@ Identity caveat: `agent_sp_name` / `agent_sp_app_id` are NULL on all 3 hero tick
 1. Confirm REDEPLOY.md verify steps 1-4 pass, or, after a rollback, the REDEPLOY.md rollback verify.
 2. Leave all 3 hero tickets (45040, 98532, 10211) `pending`. If any was approved in a rehearsal, ask @ml-engineer to re-draft. The dedup guard returns `existing_ticket` for pending tickets only.
 3. Browser at 1440x900 and 100% zoom, signed in as the presenter (the approver email is taken from x-forwarded-email).
-4. Do not open the Margin explorer tab during scenes 1-7. P3-APP-EXPLORER is descoped until after the demo, and the dashboard explorer page covers margin browsing (REDEPLOY.md l.20, CEO_ACTION_SHEET.md l.8). The live build 01f1df66 also shows contribution margin in whole dollars (for example Wavelength $1,815,451,951), not to the cent (DEC-030). Stay on the Approval queue tab and its evidence panel: they show only ticket monthly cost and savings, with no CM value. For CM, quote Margin Genie (USD 2,375,095,705.09) or the dashboard (DEC-040). (DSN-REVIEW-COO-Q-20261114-1-FALLBACK)
+4. Do not open the Margin explorer tab during scenes 1-7. P3-APP-EXPLORER is descoped until after the demo, and the dashboard explorer page covers margin browsing (REDEPLOY.md l.20, CEO_ACTION_SHEET.md l.8). The build of record 01f1e1da shows contribution margin to the cent (for example Wavelength $1,815,451,950.86), but the explorer is not a stage surface for exact CM (DEC-040). Stay on the Approval queue tab and its evidence panel: they show only ticket monthly cost and savings, with no CM value. For CM, quote Margin Genie (USD 2,375,095,705.09) or the dashboard (DEC-040). (DSN-REVIEW-COO-Q-20261114-1-FALLBACK)
 
 ## Storyboard
 | # | Screen | Click | Say | Expected on screen |
 | --- | --- | --- | --- | --- |
 | 1 | Header "Lakelink Fiber \| Margin Truth" | None | "The grooming agent asked Margin Genie, scored the circuits, and drafted savings tickets." | Tabs: Approval queue, Margin explorer, Margin Genie (one panel visible at a time) |
 | 2 | Approval queue | Approver role = Ops, Status = Pending | "Ops owns off-net grooming approvals." | 3 tickets, circuits 10211, 98532 and 45040 (newest first), no TEST rows |
-| 3 | Row GROOM-1e655052ef | Read the rationale under the ticket title | "Circuit 10211 runs 476 meters from our own fiber. We lease it from Partner Carrier 28 for $1,365 a month and can save $1,358." | Monthly cost $1,365, Est. monthly savings $1,358, Vendor "Partner Carrier 28" with ID 00100000000264YAAA below it, rationale "Margin Genie confirms circuit 10211 runs parallel to Lakelink Fiber's own fiber at only 476 meters distance..." |
+| 3 | Row GROOM-1e655052ef | Read the rationale under the ticket title | "Circuit 10211 runs 476 meters from our own fiber. We lease it from Partner Carrier 28 for $1,364.58 a month and can save $1,357.85." | Monthly cost $1,364.58, Est. monthly savings $1,357.85, Vendor "Partner Carrier 28" with ID 00100000000264YAAA below it, rationale "Margin Genie confirms circuit 10211 runs parallel to Lakelink Fiber's own fiber at only 476 meters distance..." |
 | 4 | Same row | Type "Move on-net Q1" in Comment (optional), then Approve | "Agents act, people approve." | Row leaves the pending list. Screen reader announcement: "<ticket title> approved by Ops. Decision recorded in the audit log." Focus moves to "Evidence for GROOM-1e655052ef" |
 | 5 | Evidence for GROOM-1e655052ef | Opens after the decision | "Every action has an identity and a record." | Agent: lakelink-margin-grooming-agent. Audit row: action Approved, actor = presenter email, role Ops, timestamp, details "Comment: Move on-net Q1" |
 | 6 | Evidence panel | Click "Open trace <id>" (the id is this ticket's own approval_tickets.trace_id) | "Here is every step the agent took." | MLflow trace tr-2b088edfed85d22b2db662a6c0a7c68e: ask_margin_genie (real Margin Genie call), score_onnet_move, draft_savings_ticket (INSERT) |
@@ -47,7 +45,7 @@ Identity caveat: `agent_sp_name` / `agent_sp_app_id` are NULL on all 3 hero tick
 | 7 | Trace span `ask_margin_genie` | Expand | "The agent asked the same Margin Genie the CFO used." | Genie question and answer (no contribution margin claim here; exact CM is claimed only on Margin Genie and the dashboard, DEC-040) |
 | 8 | Back to app | None (do NOT approve the other tickets) | "Two more candidates, 45040 and 98532, are waiting for Ops." | 2 tickets remain pending for Ops: GROOM-6d8f8ce31e (98532) and GROOM-44c3612b69 (45040) |
 
-Approved on stage: $1,358 a month on screen (exact 1,357.85). Still pending after scene 5: 879.34 + 469.00 = 1,348.34 a month.
+Approved on stage: $1,357.85 a month on screen. Still pending after scene 5: $879.34 + $469.00 = $1,348.34 a month.
 
 ## Reset after a rehearsal
 Approved tickets cannot be re-approved (409, not pending).
