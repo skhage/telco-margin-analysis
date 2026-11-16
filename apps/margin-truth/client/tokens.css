@@ -69,7 +69,19 @@ td.num, th.num { text-align: right; white-space: nowrap; overflow-wrap: normal; 
 .llf-comment { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--llf-muted); flex-basis: 100%; }
 .llf-comment input { font: inherit; font-size: 14px; min-height: 40px; padding: 0 var(--llf-space-1); border: 1px solid var(--llf-border-strong); border-radius: var(--llf-radius); background: var(--llf-card); color: var(--llf-text); }
 .llf-comment input:focus-visible { outline: 3px solid var(--llf-focus); outline-offset: 2px; }
-.llf-genie { width: 100%; height: min(640px, 75vh); border: 1px solid var(--llf-border); border-radius: var(--llf-radius); }
+/* Margin Genie native chat (no iframe): thread, question bubble, answers, suggestions, input row */
+.llf-genie-thread { max-height: min(560px, 65vh); overflow-y: auto; display: flex; flex-direction: column; gap: var(--llf-space-3); }
+.llf-genie-turn { display: flex; flex-direction: column; gap: var(--llf-space-1); }
+.llf-genie-q { align-self: flex-end; margin: 0; max-width: 80%; background: var(--llf-secondary); color: #fff; padding: var(--llf-space-1) var(--llf-space-2); border-radius: var(--llf-radius); }
+.llf-genie-answer { border-left: 3px solid var(--llf-primary); padding-left: var(--llf-space-2); }
+.llf-genie-text { margin: 0 0 var(--llf-space-1) 0; white-space: pre-wrap; }
+.llf-genie-sql summary { cursor: pointer; color: var(--llf-primary-ink); font-size: 13px; min-height: 24px; }
+.llf-genie-sql pre { background: var(--llf-surface); border: 1px solid var(--llf-border); border-radius: var(--llf-radius); padding: var(--llf-space-1); overflow-x: auto; font-size: 13px; white-space: pre-wrap; }
+.llf-genie-suggest { display: flex; flex-wrap: wrap; gap: var(--llf-space-1); margin-bottom: var(--llf-space-2); }
+.llf-genie-form { display: flex; gap: var(--llf-space-1); flex-wrap: wrap; margin-bottom: var(--llf-space-1); }
+.llf-genie-form input { flex: 1 1 320px; font: inherit; min-height: 44px; padding: 0 var(--llf-space-2); border: 1px solid var(--llf-border-strong); border-radius: var(--llf-radius); background: var(--llf-card); color: var(--llf-text); }
+.llf-genie-form input:focus-visible, .llf-genie-sql summary:focus-visible { outline: 3px solid var(--llf-focus); outline-offset: 2px; }
+.llf-link { color: var(--llf-primary-ink); }
 body, main { overflow-wrap: anywhere; }
 .llf-header h1 { min-width: 0; }
 @media (max-width: 720px) {

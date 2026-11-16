@@ -247,13 +247,135 @@ function MarginExplorer({ metricView, genieSpaceId }: { metricView: string; geni
   );
 }
 
+// Margin Genie: native chat over the Genie Conversation API (server proxies /api/genie/*). No iframe.
+type GenieAttachment = {
+  id: string | null; text: string | null; sql: string | null; description: string | null; title: string | null;
+  suggestions: string[]; columns: string[]; rows: (string | null)[][]; rowCount: number; resultError: string | null;
+};
+type GenieTurn = { question: string; status: "thinking" | "done" | "error"; progress?: string; attachments: GenieAttachment[]; error?: string };
+const GENIE_PROGRESS: Record<string, string> = {
+  SUBMITTED: "Sending question", FILTERING_CONTEXT: "Reading the margin metric views", FETCHING_METADATA: "Reading the margin metric views",
+  ASKING_AI: "Thinking", PENDING_WAREHOUSE: "Waiting for the SQL warehouse", EXECUTING_QUERY: "Running the query",
+};
+const GENIE_STARTERS = [
+  "What is contribution margin by product family this quarter?",
+  "Which vendors have the lowest contribution margin?",
+  "How does margin compare for legacy versus strategic products?",
+];
+const isNum = (v: string | null) => v != null && /^-?\d+(\.\d+)?(E-?\d+)?$/i.test(v);
+
+function GenieAnswer({ a }: { a: GenieAttachment }) {
+  return (
+    <div className="llf-genie-answer">
+      {a.text && <p className="llf-genie-text">{a.text}</p>}
+      {a.sql && (
+        <>
+          {a.description && <p className="llf-muted">{a.description}</p>}
+          {a.resultError && <p role="alert" className="llf-error">The result could not be loaded. Try asking again. <small>({a.resultError})</small></p>}
+          {!a.resultError && a.columns.length === 0 && <p className="llf-muted">No rows returned.</p>}
+          {a.columns.length > 0 && (
+            <div className="llf-table-wrap"><table>
+              <caption className="llf-caption">{a.title ?? "Result"} ({plural(a.rowCount, "row", "rows")}{a.rowCount > a.rows.length ? `, first ${a.rows.length} shown` : ""})</caption>
+              <thead><tr>{a.columns.map((c, i) => <th key={i} scope="col" className={a.rows.length && isNum(a.rows[0][i]) ? "num" : undefined}>{c}</th>)}</tr></thead>
+              <tbody>{a.rows.map((r, i) => (
+                <tr key={i}>{r.map((v, j) => <td key={j} className={isNum(v) ? "num" : undefined}>{orNA(v)}</td>)}</tr>
+              ))}</tbody>
+            </table></div>
+          )}
+          <details className="llf-genie-sql"><summary>Show SQL</summary><pre><code>{a.sql}</code></pre></details>
+        </>
+      )}
+    </div>
+  );
+}
+
 function MarginGenie({ cfg }: { cfg: Config }) {
+  const [turns, setTurns] = useState<GenieTurn[]>([]);
+  const [question, setQuestion] = useState("");
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [announce, setAnnounce] = useState("");
+  const endRef = useRef<HTMLDivElement>(null);
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
+  useEffect(() => { if (turns.length) endRef.current?.scrollIntoView({ block: "end", behavior: "smooth" }); }, [turns]);
+
   if (!cfg.genieSpaceId) return <p className="llf-state">Margin Genie is being set up. It will appear here when it is published.</p>;
+
+  const update = (i: number, patch: Partial<GenieTurn>) => setTurns((t) => t.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const ask = async (q: string) => {
+    const text = q.trim();
+    if (!text || busy) return;
+    const i = turns.length;
+    setBusy(true); setQuestion("");
+    setTurns((t) => [...t, { question: text, status: "thinking", progress: "Sending question", attachments: [] }]);
+    setAnnounce("Question sent to Margin Genie.");
+    try {
+      const started = await api<{ conversationId: string; messageId: string }>("/api/genie/ask", { method: "POST", body: JSON.stringify({ question: text, conversationId }) });
+      setConversationId(started.conversationId);
+      const t0 = Date.now();
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 1500));
+        if (!alive.current) return;
+        const m = await api<{ status: string; done: boolean; error: string | null; attachments: GenieAttachment[] }>(
+          `/api/genie/conversations/${encodeURIComponent(started.conversationId)}/messages/${encodeURIComponent(started.messageId)}`,
+        );
+        if (!m.done) {
+          update(i, { progress: GENIE_PROGRESS[m.status] ?? "Thinking" });
+          if (Date.now() - t0 > 180_000) throw new Error("Genie took longer than 3 minutes");
+          continue;
+        }
+        if (m.status !== "COMPLETED") throw new Error(m.error ?? `Genie ${m.status.toLowerCase()}`);
+        update(i, { status: "done", attachments: m.attachments });
+        setAnnounce("Margin Genie answered.");
+        break;
+      }
+    } catch (e) {
+      update(i, { status: "error", error: (e as Error).message });
+      setAnnounce("Margin Genie could not answer. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const newConversation = () => { setTurns([]); setConversationId(null); setAnnounce("New conversation started."); };
+
+  const last = turns[turns.length - 1];
+  const suggestions = turns.length === 0 ? GENIE_STARTERS
+    : last?.status === "done" ? last.attachments.flatMap((a) => a.suggestions).slice(0, 3) : [];
+
   return (
     <section aria-labelledby="genie-h">
       <h2 id="genie-h">Margin Genie</h2>
       <p>Ask in plain English. Finance, Ops, Sales and Marketing share one Genie and one definition of margin.</p>
-      <iframe title="Lakelink Fiber Margin Genie" className="llf-genie" src={`${cfg.workspaceHost}/genie/rooms/${cfg.genieSpaceId}?isEmbedded=true`} />
+      <p className="llf-sr-only" role="status" aria-live="polite">{announce}</p>
+      <div className="llf-card llf-genie-thread" aria-label="Margin Genie conversation">
+        {turns.length === 0 && <p className="llf-state">Ask a margin question to start.</p>}
+        {turns.map((t, i) => (
+          <div key={i} className="llf-genie-turn">
+            <p className="llf-genie-q"><span className="llf-sr-only">You asked: </span>{t.question}</p>
+            {t.status === "thinking" && <p className="llf-muted">{t.progress ?? "Thinking"}...</p>}
+            {t.status === "error" && <p role="alert" className="llf-error">Margin Genie could not answer. Try again. <small>({t.error})</small></p>}
+            {t.status === "done" && (t.attachments.length
+              ? t.attachments.map((a, k) => <GenieAnswer key={a.id ?? k} a={a} />)
+              : <p className="llf-muted">No answer returned. Try rephrasing the question.</p>)}
+          </div>
+        ))}
+        <div ref={endRef} />
+      </div>
+      {suggestions.length > 0 && (
+        <div className="llf-genie-suggest" role="group" aria-label="Suggested questions">
+          {suggestions.map((s) => <button key={s} type="button" className="llf-btn" disabled={busy} onClick={() => ask(s)}>{s}</button>)}
+        </div>
+      )}
+      <form className="llf-genie-form" onSubmit={(e) => { e.preventDefault(); ask(question); }}>
+        <label htmlFor="llf-genie-input" className="llf-sr-only">Ask Margin Genie</label>
+        <input id="llf-genie-input" value={question} onChange={(e) => setQuestion(e.target.value)} maxLength={4000} disabled={busy}
+          placeholder="Ask about margin, for example: which product families lost margin last quarter?" />
+        <button type="submit" className="llf-btn llf-btn--approve" disabled={busy || !question.trim()}>{busy ? "Asking..." : "Ask"}</button>
+        {conversationId && <button type="button" className="llf-btn" disabled={busy} onClick={newConversation}>New conversation</button>}
+      </form>
+      <p className="llf-muted"><small>Answers come from the governed margin metric views.{" "}
+        <a className="llf-link" href={`${cfg.workspaceHost}/genie/rooms/${cfg.genieSpaceId}`} target="_blank" rel="noreferrer">Open in Genie<ExternalLinkIcon /></a></small></p>
     </section>
   );
 }

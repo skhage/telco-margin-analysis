@@ -168,6 +168,102 @@ app.get("/api/health", (_req, res) => res.json({ ok: true, app: "lakelink-margin
 app.get("/api/me", (req, res) => res.json(approver(req)));
 app.get("/api/config", (_req, res) => res.json({ genieSpaceId: GENIE_SPACE_ID, workspaceHost: HOST, mlflowExperimentId: MLFLOW_EXPERIMENT_ID, metricView: MARGIN_MV }));
 
+// ---------- Margin Genie (Genie Conversation API, native chat - no iframe) ----------
+// GENIE_AUTH=app (default): app service principal (needs CAN_RUN on the space + UC read on the metric views).
+// GENIE_AUTH=user: forwarded user token (requires the dashboards.genie user API scope on the app).
+const GENIE_AUTH = (process.env.GENIE_AUTH ?? "app").toLowerCase();
+const GENIE_ID_RE = /^[0-9a-zA-Z-]+$/;
+const GENIE_DONE = new Set(["COMPLETED", "FAILED", "CANCELLED", "QUERY_RESULT_EXPIRED"]);
+type GenieAttachment = {
+  attachment_id?: string;
+  text?: { content?: string };
+  query?: { query?: string; description?: string; title?: string };
+  suggested_questions?: { questions?: string[] };
+};
+type GenieMessage = { id?: string; message_id?: string; status: string; attachments?: GenieAttachment[]; error?: { error?: string; type?: string } };
+type GenieQueryResult = {
+  statement_response?: {
+    manifest?: { schema?: { columns?: { name: string }[] }; total_row_count?: number };
+    result?: { data_array?: (string | null)[][] };
+  };
+};
+
+async function genie<T>(req: Request, method: string, p: string, body?: unknown): Promise<T> {
+  const userToken = GENIE_AUTH === "user" ? req.header("x-forwarded-access-token") : undefined;
+  const token = userToken || (await workspaceToken());
+  const res = await fetch(`${HOST}/api/2.0/genie/spaces/${GENIE_SPACE_ID}${p}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Genie ${res.status}: ${(await res.text()).slice(0, 500)}`);
+  return (await res.json()) as T;
+}
+
+// Start a conversation, or add a follow-up to an existing one. Returns ids immediately; the client polls for the answer.
+app.post("/api/genie/ask", async (req: Request, res: Response) => {
+  if (!GENIE_SPACE_ID) return res.status(503).json({ error: "Margin Genie is not configured" });
+  const question = String(req.body?.question ?? "").trim().slice(0, 4000);
+  const conversationId = String(req.body?.conversationId ?? "");
+  if (!question) return res.status(400).json({ error: "question is required" });
+  if (conversationId && !GENIE_ID_RE.test(conversationId)) return res.status(400).json({ error: "bad conversation id" });
+  try {
+    if (conversationId) {
+      const m = await genie<GenieMessage>(req, "POST", `/conversations/${conversationId}/messages`, { content: question });
+      return res.json({ conversationId, messageId: m.message_id ?? m.id });
+    }
+    const r = await genie<{ conversation_id: string; message_id: string }>(req, "POST", "/start-conversation", { content: question });
+    res.json({ conversationId: r.conversation_id, messageId: r.message_id });
+  } catch (e) {
+    console.warn(`genie ask failed: ${(e as Error).message}`);
+    res.status(502).json({ error: (e as Error).message });
+  }
+});
+
+// Poll a message. When finished, inline text answers, generated SQL, suggested questions and query results (first 200 rows).
+app.get("/api/genie/conversations/:cid/messages/:mid", async (req: Request, res: Response) => {
+  const { cid, mid } = req.params;
+  if (!GENIE_SPACE_ID) return res.status(503).json({ error: "Margin Genie is not configured" });
+  if (!GENIE_ID_RE.test(cid) || !GENIE_ID_RE.test(mid)) return res.status(400).json({ error: "bad id" });
+  try {
+    const m = await genie<GenieMessage>(req, "GET", `/conversations/${cid}/messages/${mid}`);
+    const done = GENIE_DONE.has(m.status);
+    const attachments = await Promise.all(
+      (done ? m.attachments ?? [] : []).map(async (a) => {
+        const out = {
+          id: a.attachment_id ?? null,
+          text: a.text?.content ?? null,
+          sql: a.query?.query ?? null,
+          description: a.query?.description ?? null,
+          title: a.query?.title ?? null,
+          suggestions: a.suggested_questions?.questions ?? [],
+          columns: [] as string[],
+          rows: [] as (string | null)[][],
+          rowCount: 0,
+          resultError: null as string | null,
+        };
+        if (a.query && a.attachment_id && m.status === "COMPLETED") {
+          try {
+            const qr = await genie<GenieQueryResult>(req, "GET", `/conversations/${cid}/messages/${mid}/attachments/${a.attachment_id}/query-result`);
+            const sr = qr.statement_response;
+            const data = sr?.result?.data_array ?? [];
+            out.columns = sr?.manifest?.schema?.columns?.map((c) => c.name) ?? [];
+            out.rowCount = sr?.manifest?.total_row_count ?? data.length;
+            out.rows = data.slice(0, 200);
+          } catch (e) {
+            out.resultError = (e as Error).message;
+          }
+        }
+        return out;
+      }),
+    );
+    res.json({ status: m.status, done, error: m.error?.error ?? null, attachments });
+  } catch (e) {
+    console.warn(`genie poll failed: ${(e as Error).message}`);
+    res.status(502).json({ error: (e as Error).message });
+  }
+});
+
 app.get("/api/tickets", async (req: Request, res: Response) => {
   const role = String(req.query.role ?? "");
   const status = String(req.query.status ?? "pending");
