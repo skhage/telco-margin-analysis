@@ -1,5 +1,7 @@
 # Lakelink Fiber Margin Truth - the ONE Databricks App for telco-margin-analysis (P3-APP-SCAFFOLD)
 # Build locally/CI with `npm ci && npm run build`; dist/ is deployed.
+# CONFIG: env values below are written by scripts/sync_config_surfaces.py (surface "app") from
+# bundle/project_config.yml. Change names there, then run the script with --apply; do not hand-edit.
 command: ["node", "dist/server/index.js"]
 env:
   # Approval queue: dedicated Lakebase project, public schema only (no new Postgres schemas)
@@ -9,17 +11,21 @@ env:
     value: "ep-calm-king-d2mq878u.database.us-east-1.cloud.databricks.com"
   - name: LAKEBASE_DB
     value: "databricks_postgres"
-  # Margin explorer: metric views in cdm_tmforum._metrics (MEASURE() only, DEC-002)
+  # Margin explorer: metric views in <catalog>.<metrics_schema> (MEASURE() only, DEC-002)
   - name: DATABRICKS_WAREHOUSE_ID
     valueFrom: sql-warehouse
   - name: MARGIN_MV
     value: "cdm_tmforum._metrics.margin_ledger_mv"
+  - name: MARGIN_VENDORS
+    value: "cdm_tmforum.revenue_assurance.margin_vendors"
   # Margin Genie (set when P3-MARGIN-GENIE creates the ONE space)
   - name: GENIE_SPACE_ID
     value: "01f1df115a08164aab3ae5f6faac807c"
-  # Native Genie chat (Conversation API, no iframe). app = app service principal; user = forwarded user token (needs dashboards.genie scope)
+  # DEC-SOX-OBO: all Unity Catalog reads (SQL warehouse + Genie) run on behalf of the signed-in user
+  # (x-forwarded-access-token; app user API scopes: sql, dashboards.genie). The app SP is used only for Lakebase.
+  # Informational only; server/index.ts no longer reads it and has no SP fallback.
   - name: GENIE_AUTH
-    value: "app"
+    value: "user"
   - name: MLFLOW_EXPERIMENT_ID
     value: "1235449331932066"
   # APP-HIDE-TEST-TICKETS: hide TEST-* tickets from queue/decision/evidence (non-destructive; set "true" to show)

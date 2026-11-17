@@ -19,22 +19,32 @@
   --llf-space-1: 8px; --llf-space-2: 16px; --llf-space-3: 24px; --llf-space-4: 32px;
   --llf-radius: 8px;
   --llf-font: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Workbook (spreadsheet) surface */
+  --llf-grid: #e6e2dc;        /* gridlines */
+  --llf-grid-head: #f3f1ed;   /* column-letter / row-number gutters */
+  --llf-select: #007a52;      /* selected cell outline + highlighted row/column header (accent ink, AA on white) */
+  --llf-select-tint: #e8f5ef; /* selected cell fill */
 }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: var(--llf-font); color: var(--llf-text); background: var(--llf-surface); }
-.llf-header { background: var(--llf-secondary); color: #fff; padding: var(--llf-space-2) var(--llf-space-3); display: flex; align-items: center; gap: var(--llf-space-2); }
-.llf-header h1 { font-size: 20px; margin: 0; font-weight: 600; }
-.llf-mark { width: 12px; height: 24px; background: var(--llf-primary); border-radius: 2px; }
-.llf-tabs { display: flex; gap: var(--llf-space-1); padding: 0 var(--llf-space-3); background: var(--llf-card); border-bottom: 1px solid var(--llf-border); }
-.llf-tab { border: 0; background: none; padding: var(--llf-space-2); font: inherit; color: var(--llf-muted); cursor: pointer; border-bottom: 3px solid transparent; min-height: 44px; }
-.llf-tab[aria-selected="true"] { color: var(--llf-text); border-bottom-color: var(--llf-primary); font-weight: 600; }
+/* Workbook shell: white title bar, content fills the viewport, sheet tabs pinned to the bottom (Row Zero-style) */
+.llf-app { display: flex; flex-direction: column; height: 100vh; }
+.llf-header { flex: none; background: var(--llf-card); color: var(--llf-text); border-bottom: 1px solid var(--llf-border); padding: 0 var(--llf-space-2); min-height: 48px; display: flex; align-items: center; gap: var(--llf-space-1); }
+.llf-header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+.llf-header-sub { margin-left: auto; color: var(--llf-muted); font-size: 13px; }
+.llf-mark { width: 8px; height: 20px; background: var(--llf-primary); border-radius: 2px; }
+.llf-tabs { flex: none; display: flex; gap: 0; padding: 0 var(--llf-space-1); background: var(--llf-grid-head); border-top: 1px solid var(--llf-border-strong); }
+.llf-tab { border: 0; border-right: 1px solid var(--llf-border); border-top: 3px solid transparent; background: none; padding: 0 var(--llf-space-2); font: inherit; font-size: 13px; color: var(--llf-muted); cursor: pointer; min-height: 44px; }
+.llf-tab[aria-selected="true"] { color: var(--llf-text); background: var(--llf-card); border-top-color: var(--llf-primary); font-weight: 600; }
 .llf-tab:focus-visible, .llf-btn:focus-visible, select:focus-visible, a:focus-visible, [tabindex="-1"]:focus { outline: 3px solid var(--llf-focus); outline-offset: 2px; }
 select { font: inherit; min-height: 40px; padding: 0 var(--llf-space-1); border: 1px solid var(--llf-border-strong); border-radius: var(--llf-radius); background: var(--llf-card); color: var(--llf-text); }
 .llf-panel:focus-visible { outline: 3px solid var(--llf-focus); outline-offset: 2px; }
 .llf-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .llf-table-wrap { overflow-x: auto; max-width: 100%; }
 .llf-actions { display: flex; gap: var(--llf-space-1); flex-wrap: wrap; }
-main { padding: var(--llf-space-3); max-width: 1280px; margin: 0 auto; }
+main { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0; margin: 0; }
+.llf-panel { height: 100%; }
+.llf-doc { padding: var(--llf-space-3); max-width: 1280px; margin: 0 auto; }
 .llf-card { background: var(--llf-card); border: 1px solid var(--llf-border); border-radius: var(--llf-radius); padding: var(--llf-space-2); margin-bottom: var(--llf-space-2); }
 .llf-btn { font: inherit; border-radius: var(--llf-radius); padding: var(--llf-space-1) var(--llf-space-2); min-height: 40px; cursor: pointer; border: 1px solid var(--llf-border-strong); background: var(--llf-card); color: var(--llf-secondary); }
 .llf-btn:disabled { cursor: not-allowed; opacity: 0.7; }
@@ -84,8 +94,55 @@ td.num, th.num { text-align: right; white-space: nowrap; overflow-wrap: normal; 
 .llf-link { color: var(--llf-primary-ink); }
 body, main { overflow-wrap: anywhere; }
 .llf-header h1 { min-width: 0; }
+/* Approval queue as a workbook sheet: toolbar, formula bar, grid, optional evidence side panel */
+.llf-sheet { display: flex; flex-direction: column; height: 100%; }
+.llf-toolbar { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: var(--llf-space-2); padding: 4px var(--llf-space-2); background: var(--llf-surface); border-bottom: 1px solid var(--llf-border); font-size: 13px; }
+.llf-toolbar label { display: flex; align-items: center; gap: var(--llf-space-1); color: var(--llf-muted); }
+.llf-toolbar select { min-height: 32px; font-size: 13px; }
+.llf-toolbar-sep { width: 1px; align-self: stretch; background: var(--llf-border); }
+.llf-toolbar-note { margin-left: auto; color: var(--llf-muted); }
+.llf-btn--sm { min-height: 32px; padding: 0 12px; font-size: 13px; }
+.llf-fbar { flex: none; display: flex; align-items: stretch; min-height: 32px; background: var(--llf-card); border-bottom: 1px solid var(--llf-border); font-size: 13px; }
+.llf-fbar-ref { flex: none; width: 88px; display: flex; align-items: center; padding: 0 var(--llf-space-1); border-right: 1px solid var(--llf-border); font-weight: 600; font-variant-numeric: tabular-nums; }
+.llf-fbar-fx { flex: none; display: flex; align-items: center; padding: 0 var(--llf-space-1); border-right: 1px solid var(--llf-border); color: var(--llf-muted); font-style: italic; font-family: Georgia, serif; }
+.llf-fbar-val { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; padding: 0 var(--llf-space-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.llf-sheet-body { flex: 1 1 auto; min-height: 0; display: flex; }
+.llf-grid-wrap { flex: 1 1 auto; min-width: 0; overflow: auto; background: var(--llf-card); }
+.llf-grid-msg { padding: var(--llf-space-2); margin: 0; }
+.llf-grid { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.llf-grid th, .llf-grid td { height: 32px; padding: 0 var(--llf-space-1); border-bottom: 1px solid var(--llf-grid); border-right: 1px solid var(--llf-grid); white-space: nowrap; vertical-align: middle; }
+.llf-grid thead th, .llf-grid thead td { position: sticky; top: 0; z-index: 2; height: auto; padding: 0; background: var(--llf-grid-head); color: var(--llf-text); font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--llf-border-strong); }
+.llf-colletter { display: block; height: 20px; line-height: 20px; text-align: center; color: var(--llf-muted); font-size: 11px; font-weight: 500; border-bottom: 1px solid var(--llf-grid); }
+.llf-colname { display: block; height: 28px; line-height: 28px; padding: 0 var(--llf-space-1); }
+.llf-grid thead th.llf-colhead--sel .llf-colletter { background: var(--llf-select); color: #fff; }
+.llf-grid td.llf-rownum { position: sticky; left: 0; z-index: 1; width: 44px; min-width: 44px; text-align: center; background: var(--llf-grid-head); color: var(--llf-muted); font-size: 12px; border-right: 1px solid var(--llf-border-strong); }
+.llf-grid thead td.llf-rownum { z-index: 3; }
+.llf-grid td.llf-rownum--sel { background: var(--llf-select); color: #fff; }
+.llf-grid td.llf-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; cursor: cell; }
+.llf-grid td.llf-cell--title { max-width: 260px; }
+.llf-grid td.llf-cell--wide { max-width: 340px; color: var(--llf-muted); }
+.llf-grid td.llf-cell--ctl { max-width: none; overflow: visible; }
+.llf-grid td.llf-cell:focus, .llf-grid td.llf-cell:focus-visible { outline: none; }
+.llf-grid td.llf-cell--sel { background: var(--llf-select-tint); box-shadow: inset 0 0 0 2px var(--llf-select); }
+.llf-grid strong { font-weight: 600; }
+.llf-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+.llf-cell-input { width: 180px; height: 26px; font: inherit; font-size: 13px; padding: 0 6px; border: 1px solid var(--llf-border-strong); border-radius: 4px; background: var(--llf-card); color: var(--llf-text); }
+.llf-cell-input:focus-visible { outline: 2px solid var(--llf-focus); outline-offset: 1px; }
+.llf-grid .llf-actions { flex-wrap: nowrap; gap: 4px; }
+.llf-grid .llf-btn { min-height: 26px; padding: 0 var(--llf-space-1); font-size: 12px; border-radius: 4px; }
+.llf-grid .llf-badge { font-size: 12px; padding: 0 6px; }
+.llf-side { flex: 0 0 400px; max-width: 45%; overflow: auto; padding: var(--llf-space-2); background: var(--llf-card); border-left: 1px solid var(--llf-border-strong); font-size: 14px; }
+.llf-side-head { display: flex; align-items: center; justify-content: space-between; gap: var(--llf-space-1); margin-bottom: var(--llf-space-2); }
+.llf-side h3 { margin: 0; font-size: 15px; }
+@media (max-width: 900px) {
+  .llf-panel, .llf-sheet { height: auto; }
+  .llf-sheet-body { flex-direction: column; }
+  .llf-grid-wrap { max-height: 60vh; }
+  .llf-side { flex: none; max-width: none; border-left: 0; border-top: 1px solid var(--llf-border-strong); }
+  .llf-toolbar-note { margin-left: 0; flex-basis: 100%; }
+}
 @media (max-width: 720px) {
-  main { padding: var(--llf-space-2); }
+  .llf-doc { padding: var(--llf-space-2); }
   .llf-tabs { overflow-x: auto; padding: 0 var(--llf-space-2); }
   .llf-table-wrap th:first-child, .llf-table-wrap td:first-child { position: sticky; left: 0; background: var(--llf-card); z-index: 1; }
   .llf-table-wrap table { min-width: 640px; }

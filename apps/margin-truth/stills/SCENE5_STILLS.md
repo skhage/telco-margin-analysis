@@ -19,7 +19,7 @@ Frames link ../../client/tokens.css (the app's design tokens, unchanged). Open f
 | 3 | Evidence panel after approval (projected) | "Agents act, people approve. Every action has an identity and a record." | Agent lakelink-margin-grooming-agent; Agent identity = user identity (fallback) stephen.hage@databricks.com; trace tr-2b088edfed85d22b2db662a6c0a7c68e; audit Created (real, audit_id 6) + Approved (projected); 2 tickets still pending |
 | 4 | MLflow trace | Hand off to the @ml-engineer scene 6 pack: recordings/scene6/SCENE6_EVIDENCE.md | Spans, gateway usage, Genie audit |
 
-Hero savings on screen: $1,357.85 a month (circuit 10211). Queue total, if asked: 1,357.85 + 879.34 + 469.00 = $2,706.19 a month. The old '$1,348 a month' 2-ticket total is retired.
+Hero savings on screen: $1,357.85 a month (circuit 10211). Still pending after scene 5: $879.34 + $469.00 = $1,348.34 a month. Full queue before approval, if asked: $2,706.19 a month.
 
 ## Number tie-out (verified 2026-11-14 by SQL, MEASURE on the MV vs app Lakebase rows)
 | Ticket | Circuit | Ticket monthly cost | MV monthly cost | Ticket savings | MV savings | Diff |

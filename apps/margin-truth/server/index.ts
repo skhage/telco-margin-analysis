@@ -1,6 +1,7 @@
 // Lakelink Fiber Margin Truth - API server (Express + pg). ONE app for telco-margin-analysis.
-// Approval queue: Lakebase project telco-margin-analysis-app, schema public only.
-// Margin explorer: reads cdm_tmforum._metrics.margin_* metric views with MEASURE(); never recomputes margin (DEC-002).
+// Approval queue: Lakebase project LAKEBASE_ENDPOINT, schema public only.
+// Margin explorer: reads the MARGIN_MV metric view with MEASURE(); never recomputes margin (DEC-002).
+// CONFIG: every name comes from app.yaml env, which scripts/sync_config_surfaces.py fills from bundle/project_config.yml.
 import express, { Request, Response } from "express";
 import pg from "pg";
 import path from "node:path";
@@ -9,11 +10,14 @@ import { fileURLToPath } from "node:url";
 const HOST = (process.env.DATABRICKS_HOST ?? "").replace(/^(?!https?:\/\/)/, "https://");
 const CLIENT_ID = process.env.DATABRICKS_CLIENT_ID ?? "";
 const CLIENT_SECRET = process.env.DATABRICKS_CLIENT_SECRET ?? "";
-const LAKEBASE_ENDPOINT = process.env.LAKEBASE_ENDPOINT ?? "projects/telco-margin-analysis-app/branches/production/endpoints/primary";
+const LAKEBASE_ENDPOINT = process.env.LAKEBASE_ENDPOINT ?? "";
 const LAKEBASE_HOST = process.env.LAKEBASE_HOST ?? "";
 const LAKEBASE_DB = process.env.LAKEBASE_DB ?? "databricks_postgres";
 const WAREHOUSE_ID = process.env.DATABRICKS_WAREHOUSE_ID ?? "";
-const MARGIN_MV = process.env.MARGIN_MV ?? "cdm_tmforum._metrics.margin_ledger_mv";
+const MARGIN_MV = process.env.MARGIN_MV ?? "";
+for (const [k, v] of Object.entries({ LAKEBASE_ENDPOINT, MARGIN_MV })) {
+  if (!v) console.warn(`config: ${k} is not set (app.yaml env, from bundle/project_config.yml)`);
+}
 const GENIE_SPACE_ID = process.env.GENIE_SPACE_ID ?? "";
 const MLFLOW_EXPERIMENT_ID = process.env.MLFLOW_EXPERIMENT_ID ?? "";
 // Feature flag (APP-EXPLORER-PRESTAGE): auto = go live as soon as the metric view exists; on = always query; off = hide.
@@ -44,10 +48,11 @@ async function workspaceToken(): Promise<string> {
   return j.access_token;
 }
 
-async function dbx<T>(method: string, p: string, body?: unknown): Promise<T> {
+// App SP token: ONLY for the app's own Lakebase credential. Never used to read Unity Catalog data (DEC-SOX-OBO).
+async function dbx<T>(method: string, p: string, body?: unknown, bearer?: string): Promise<T> {
   const res = await fetch(`${HOST}${p}`, {
     method,
-    headers: { Authorization: `Bearer ${await workspaceToken()}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${bearer ?? (await workspaceToken())}`, "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`${method} ${p} -> ${res.status} ${await res.text()}`);
@@ -72,13 +77,25 @@ function approver(req: Request) {
   };
 }
 
+// ---------- On-behalf-of user (DEC-SOX-OBO) ----------
+// Every Unity Catalog read (SQL warehouse + Genie) runs as the signed-in user with the forwarded token, so the
+// SOX ABAC policies (margin_sox_key_accounts, margin_sox_detail_rows, margin_sox_contract_rates) apply per user.
+// Fail closed: no forwarded token = no UC data. There is no service-principal fallback.
+class NoUserToken extends Error {}
+function userToken(req: Request): string {
+  const t = req.header("x-forwarded-access-token");
+  if (!t) throw new NoUserToken("No forwarded user token. Enable user authorization (scopes sql, dashboards.genie) on the app.");
+  return t;
+}
+const whoKey = (req: Request) => String(req.header("x-forwarded-email") ?? req.header("x-forwarded-user") ?? "unknown");
+
 // ---------- SQL warehouse (metric views) ----------
 type StatementResult = {
   status: { state: string; error?: { message: string } };
   manifest?: { schema: { columns: { name: string }[] } };
   result?: { data_array?: (string | null)[][] };
 };
-async function runSql(statement: string, parameters: { name: string; value: string; type?: string }[] = []) {
+async function runSql(req: Request, statement: string, parameters: { name: string; value: string; type?: string }[] = []) {
   const r = await dbx<StatementResult>("POST", "/api/2.0/sql/statements", {
     warehouse_id: WAREHOUSE_ID,
     statement,
@@ -86,7 +103,7 @@ async function runSql(statement: string, parameters: { name: string; value: stri
     wait_timeout: "50s",
     disposition: "INLINE",
     format: "JSON_ARRAY",
-  });
+  }, userToken(req));
   if (r.status.state !== "SUCCEEDED") throw new Error(r.status.error?.message ?? r.status.state);
   const cols = r.manifest?.schema.columns.map((c) => c.name) ?? [];
   return (r.result?.data_array ?? []).map((row) => Object.fromEntries(cols.map((c, i) => [c, row[i]])));
@@ -126,38 +143,66 @@ WHERE (:quarter = '' OR ledger_quarter = TRY_CAST(:quarter AS DATE))`;
 
 // DSN-SCENE5-R1 item 4: vendor display names (fictional Lakelink-safe carrier names) from the governed vendor table.
 // Loaded once (30 rows), cached 10 min. If the warehouse or grant is unavailable, the UI falls back to the raw vendor_id.
-const MARGIN_VENDORS = process.env.MARGIN_VENDORS ?? "cdm_tmforum.revenue_assurance.margin_vendors";
-let vendorCache: { names: Record<string, string>; at: number } | null = null;
-async function vendorNames(): Promise<Record<string, string>> {
-  if (vendorCache && Date.now() - vendorCache.at < 600_000) return vendorCache.names;
+const MARGIN_VENDORS = process.env.MARGIN_VENDORS ?? "";
+// Cached per user (OBO): one user's result is never served to another.
+const vendorCache = new Map<string, { names: Record<string, string>; at: number }>();
+async function vendorNames(req: Request): Promise<Record<string, string>> {
+  const k = whoKey(req);
+  const hit = vendorCache.get(k);
+  if (hit && Date.now() - hit.at < 600_000) return hit.names;
   try {
     if (!/^[a-z_]+\.[a-z_]+\.margin_[a-z_]+$/.test(MARGIN_VENDORS)) throw new Error("bad vendor table name");
-    const rows = await runSql(`SELECT vendor_id, vendor_name FROM ${MARGIN_VENDORS}`);
+    const rows = await runSql(req, `SELECT vendor_id, vendor_name FROM ${MARGIN_VENDORS}`);
     const names = Object.fromEntries(rows.filter((r) => r.vendor_id && r.vendor_name).map((r) => [String(r.vendor_id), String(r.vendor_name)]));
-    vendorCache = { names, at: Date.now() };
+    vendorCache.set(k, { names, at: Date.now() });
     return names;
   } catch (e) {
     console.warn(`vendor name lookup failed: ${(e as Error).message}`);
-    return vendorCache?.names ?? {};
+    return hit?.names ?? {};
   }
 }
+
+// SOX detail access is decided by Unity Catalog, not by the app: run a 1-row probe on the SOX carrier invoice
+// sub-ledger AS THE USER. If ABAC policy margin_sox_detail_rows hides every line, the user is not SOX-entitled and
+// the app also redacts the carrier cost copied into Lakebase tickets (Lakebase is outside UC policies). Cached 5 min per user.
+const SOX_PROBE_TABLE = MARGIN_VENDORS.replace(/\.margin_vendors$/, ".margin_carrier_invoices");
+const soxCache = new Map<string, { sox: boolean; at: number }>();
+async function soxDetailAccess(req: Request): Promise<boolean> {
+  const k = whoKey(req);
+  const hit = soxCache.get(k);
+  if (hit && Date.now() - hit.at < 300_000) return hit.sox;
+  let sox = false;
+  try {
+    if (!/^[a-z_]+\.[a-z_]+\.margin_carrier_invoices$/.test(SOX_PROBE_TABLE)) throw new Error("bad SOX probe table name");
+    const rows = await runSql(req, `SELECT 1 AS ok FROM ${SOX_PROBE_TABLE} LIMIT 1`);
+    sox = rows.length === 1;
+  } catch (e) {
+    console.warn(`SOX probe failed (treated as no access): ${(e as Error).message}`);
+  }
+  soxCache.set(k, { sox, at: Date.now() });
+  return sox;
+}
+const redactSox = <T extends Record<string, unknown>>(row: T, sox: boolean) =>
+  sox ? row : { ...row, monthly_cost: null, est_monthly_savings: null, sox_redacted: true };
 const withVendorName = <T extends { vendor_id?: string | null }>(row: T, names: Record<string, string>) =>
   ({ ...row, vendor_name: row.vendor_id ? names[row.vendor_id] ?? null : null });
 
 // Explorer readiness: in auto mode, check the metric view exists (cached 60s) so the tab goes live the moment it deploys.
 let mvCheck: { ready: boolean; at: number } | null = null;
-export async function explorerReady(): Promise<boolean> {
+export async function explorerReady(req: Request): Promise<boolean> {
   if (EXPLORER_MODE === "off") return false;
   if (EXPLORER_MODE === "on") return true;
   if (mvCheck && Date.now() - mvCheck.at < 60_000) return mvCheck.ready;
   const [cat, sch, name] = MARGIN_MV.split(".");
   if (!/^[a-z_]+$/.test(cat ?? "")) throw new Error("bad metric view name");
   const rows = await runSql(
+    req,
     `SELECT table_type FROM ${cat}.information_schema.tables WHERE table_schema = :sch AND table_name = :name`,
     [{ name: "sch", value: sch ?? "" }, { name: "name", value: name ?? "" }],
   );
-  mvCheck = { ready: rows.length === 1, at: Date.now() };
-  return mvCheck.ready;
+  // Only cache a positive result: a user without access to the view must not mark it missing for everyone.
+  if (rows.length === 1) mvCheck = { ready: true, at: Date.now() };
+  return rows.length === 1;
 }
 
 // ---------- API ----------
@@ -165,13 +210,18 @@ const app = express();
 app.use(express.json());
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, app: "lakelink-margin-truth" }));
-app.get("/api/me", (req, res) => res.json(approver(req)));
+app.get("/api/me", async (req, res) => {
+  try {
+    res.json({ ...approver(req), soxDetailAccess: await soxDetailAccess(req) });
+  } catch (e) {
+    res.json({ ...approver(req), soxDetailAccess: false, error: (e as Error).message });
+  }
+});
 app.get("/api/config", (_req, res) => res.json({ genieSpaceId: GENIE_SPACE_ID, workspaceHost: HOST, mlflowExperimentId: MLFLOW_EXPERIMENT_ID, metricView: MARGIN_MV }));
 
 // ---------- Margin Genie (Genie Conversation API, native chat - no iframe) ----------
-// GENIE_AUTH=app (default): app service principal (needs CAN_RUN on the space + UC read on the metric views).
-// GENIE_AUTH=user: forwarded user token (requires the dashboards.genie user API scope on the app).
-const GENIE_AUTH = (process.env.GENIE_AUTH ?? "app").toLowerCase();
+// DEC-SOX-OBO: Genie always runs as the signed-in user (forwarded token, dashboards.genie scope), so each user's
+// answers reflect their own SOX entitlements. The GENIE_AUTH env var is no longer read.
 const GENIE_ID_RE = /^[0-9a-zA-Z-]+$/;
 const GENIE_DONE = new Set(["COMPLETED", "FAILED", "CANCELLED", "QUERY_RESULT_EXPIRED"]);
 type GenieAttachment = {
@@ -189,8 +239,7 @@ type GenieQueryResult = {
 };
 
 async function genie<T>(req: Request, method: string, p: string, body?: unknown): Promise<T> {
-  const userToken = GENIE_AUTH === "user" ? req.header("x-forwarded-access-token") : undefined;
-  const token = userToken || (await workspaceToken());
+  const token = userToken(req);
   const res = await fetch(`${HOST}/api/2.0/genie/spaces/${GENIE_SPACE_ID}${p}`, {
     method,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -277,8 +326,8 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
         ORDER BY created_at DESC LIMIT 200`,
       [role, status, SHOW_TEST_TICKETS],
     );
-    const names = await vendorNames();
-    res.json(rows.map((r) => withVendorName(r, names)));
+    const [names, sox] = await Promise.all([vendorNames(req), soxDetailAccess(req)]);
+    res.json(rows.map((r) => redactSox(withVendorName(r, names), sox)));
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
   }
@@ -325,7 +374,7 @@ app.get("/api/tickets/:id/evidence", async (req: Request, res: Response) => {
     const t = await pool.query("SELECT * FROM public.approval_tickets WHERE ticket_id = $1", [req.params.id]);
     if (t.rowCount !== 1) return res.status(404).json({ error: "not found" });
     const a = await pool.query("SELECT action, actor, actor_role, details, at FROM public.approval_audit WHERE ticket_id = $1 ORDER BY at", [req.params.id]);
-    const ticket = withVendorName(t.rows[0], await vendorNames());
+    const ticket = redactSox(withVendorName(t.rows[0], await vendorNames(req)), await soxDetailAccess(req));
     // APP-TRACE-VIEW-PREBUILD: the agent's 'created' audit row carries run_as / identity_mode / trace_id (grooming agent writes these).
     const created = a.rows.find((r) => r.action === "created");
     const createdDetails = (created?.details ?? {}) as Record<string, unknown>;
@@ -352,9 +401,9 @@ app.get("/api/tickets/:id/evidence", async (req: Request, res: Response) => {
   }
 });
 
-app.get("/api/explorer/status", async (_req: Request, res: Response) => {
+app.get("/api/explorer/status", async (req: Request, res: Response) => {
   try {
-    res.json({ mode: EXPLORER_MODE, ready: await explorerReady(), metricView: MARGIN_MV });
+    res.json({ mode: EXPLORER_MODE, ready: await explorerReady(req), metricView: MARGIN_MV });
   } catch (e) {
     res.status(502).json({ error: (e as Error).message, mode: EXPLORER_MODE, metricView: MARGIN_MV });
   }
@@ -364,9 +413,9 @@ app.get("/api/explorer", async (req: Request, res: Response) => {
   const dim = String(req.query.dim ?? "product_family");
   const quarter = String(req.query.quarter ?? "");
   try {
-    if (!(await explorerReady())) return res.status(503).json({ error: "pending_mv", metricView: MARGIN_MV });
+    if (!(await explorerReady(req))) return res.status(503).json({ error: "pending_mv", metricView: MARGIN_MV });
     const params = [{ name: "quarter", value: quarter, type: "STRING" }];
-    const [rows, totals] = await Promise.all([runSql(explorerSql(dim), params), runSql(explorerTotalSql(), params)]);
+    const [rows, totals] = await Promise.all([runSql(req, explorerSql(dim), params), runSql(req, explorerTotalSql(), params)]);
     res.json({ metricView: MARGIN_MV, dimension: dim, rows, total: totals[0] ?? null });
   } catch (e) {
     res.status(502).json({ error: (e as Error).message, metricView: MARGIN_MV });

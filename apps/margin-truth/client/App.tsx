@@ -55,6 +55,13 @@ const ExternalLinkIcon = () => (
   </svg>
 );
 
+// Workbook grid columns (A..K). Row 1 is the header row, so data rows start at 2, like a spreadsheet.
+const Q_COLS = ["Ticket ID", "Title", "Rationale", "Circuit", "Vendor", "Monthly cost", "Est. monthly savings", "Agent", "Status", "Comment (optional)", "Action"] as const;
+const Q_NUM_COLS = new Set([5, 6]);
+const colLetter = (i: number) => String.fromCharCode(65 + i);
+const usdText = (v: string | null) => (v == null ? "" : usd.format(Number(v)));
+const GRID_KEYS: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, { ...init, headers: { "Content-Type": "application/json" } });
   const j = await r.json();
@@ -74,6 +81,9 @@ function ApprovalQueue() {
   const [comments, setComments] = useState<Record<string, string>>({});
   const evidenceHeading = useRef<HTMLHeadingElement>(null);
   const focusEvidence = useRef(false);
+  // Workbook grid: selected cell drives the formula bar; arrow keys move between cells, Enter/F2 enters a cell's control, Esc returns
+  const [sel, setSel] = useState<{ r: number; c: number }>({ r: 0, c: 0 });
+  const gridRef = useRef<HTMLTableElement>(null);
   useEffect(() => {
     if (evidence && focusEvidence.current) { focusEvidence.current = false; evidenceHeading.current?.focus(); }
   }, [evidence]);
@@ -84,7 +94,7 @@ function ApprovalQueue() {
     setTickets(null); setError(null); setEvidence(null); // DSN-TRACE-PANEL-R1 item 4: never show a stale panel
     if (announceLoad) setAnnounce("Loading tickets...");
     api<Ticket[]>(`/api/tickets?role=${encodeURIComponent(role)}&status=${status}`)
-      .then((rows) => { setTickets(rows); if (announceLoad) setAnnounce(`${plural(rows.length, "ticket", "tickets")} loaded.`); })
+      .then((rows) => { setTickets(rows); setSel({ r: 0, c: 0 }); if (announceLoad) setAnnounce(`${plural(rows.length, "ticket", "tickets")} loaded.`); })
       .catch((e) => setError(`Approval queue unavailable. Try again, or check that the Lakebase approval database is reachable. (${e.message})`));
   }, [role, status]);
   useEffect(() => { load(); }, [load]);
@@ -105,64 +115,137 @@ function ApprovalQueue() {
     } finally { setSavingId(null); }
   };
 
+  // Plain-text value per column for the formula bar (same formatting as the cells)
+  const cellText = (t: Ticket, c: number): string => {
+    switch (c) {
+      case 0: return t.ticket_id;
+      case 1: return t.title;
+      case 2: return t.rationale ?? "";
+      case 3: return t.circuit_id ?? "";
+      case 4: return t.vendor_name ? `${t.vendor_name} (${t.vendor_id ?? ""})` : t.vendor_id ?? "";
+      case 5: return usdText(t.monthly_cost);
+      case 6: return usdText(t.est_monthly_savings);
+      case 7: return t.agent_name;
+      case 8: return sentence(t.status);
+      case 9: return comments[t.ticket_id] ?? "";
+      default: return t.status === "pending" ? "Approve or reject" : "View evidence";
+    }
+  };
+  const moveTo = (r: number, c: number) => {
+    if (!tickets?.length) return;
+    const rr = Math.max(0, Math.min(tickets.length - 1, r));
+    const cc = Math.max(0, Math.min(Q_COLS.length - 1, c));
+    setSel({ r: rr, c: cc });
+    requestAnimationFrame(() => gridRef.current?.querySelector<HTMLElement>(`td[data-r="${rr}"][data-c="${cc}"]`)?.focus());
+  };
+  const onGridKey = (e: KeyboardEvent<HTMLTableElement>) => {
+    const el = e.target as HTMLElement;
+    if (e.key === "Escape" && el.tagName !== "TD") { el.closest<HTMLElement>("td")?.focus(); return; }
+    if (el.tagName !== "TD") return;
+    const d = GRID_KEYS[e.key];
+    if (d) { e.preventDefault(); moveTo(sel.r + d[0], sel.c + d[1]); return; }
+    if (e.key === "Enter" || e.key === "F2") {
+      const ctl = el.querySelector<HTMLElement>("input:not([disabled]), button:not([disabled])");
+      if (ctl) { e.preventDefault(); ctl.focus(); }
+    }
+  };
+  const cell = (r: number, c: number, extra = "") => {
+    const on = sel.r === r && sel.c === c;
+    return {
+      "data-r": r, "data-c": c, tabIndex: on ? 0 : -1,
+      className: `llf-cell ${extra}${on ? " llf-cell--sel" : ""}`,
+      onMouseDown: () => setSel({ r, c }), onFocus: () => setSel({ r, c }),
+    };
+  };
+  const selTicket = tickets?.[sel.r];
+
   return (
-    <section aria-labelledby="queue-h">
-      <h2 id="queue-h">Approval queue</h2>
-      <p>Agents draft. People approve. Every decision is recorded with your identity.</p>
-      <div className="llf-card" style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-        <label>Approver role{" "}
+    <section aria-labelledby="queue-h" className="llf-sheet">
+      <h2 id="queue-h" className="llf-sr-only">Approval queue</h2>
+      <div className="llf-toolbar">
+        <label>Approver role
           <select value={role} onChange={(e) => setRole(e.target.value as (typeof ROLES)[number])}>
             {ROLES.map((r) => <option key={r}>{r}</option>)}
           </select>
         </label>
-        <label>Status{" "}
+        <label>Status
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="pending">Pending</option><option value="approved">Approved</option>
             <option value="rejected">Rejected</option><option value="all">All</option>
           </select>
         </label>
+        <span className="llf-toolbar-sep" aria-hidden="true" />
+        <button type="button" className="llf-btn llf-btn--sm" onClick={() => load()} disabled={tickets === null && !error}>Refresh</button>
+        <span className="llf-toolbar-note">{tickets ? `${plural(tickets.length, "ticket", "tickets")} · ` : ""}Agents draft. People approve. Every decision is recorded with your identity.</span>
+      </div>
+      <div className="llf-fbar">
+        <span className="llf-fbar-ref" aria-label="Selected cell">{selTicket ? `${colLetter(sel.c)}${sel.r + 2}` : "A1"}</span>
+        <span className="llf-fbar-fx" aria-hidden="true">fx</span>
+        <span className="llf-fbar-val" title={selTicket ? cellText(selTicket, sel.c) : undefined}>
+          {selTicket ? cellText(selTicket, sel.c) : Q_COLS[sel.c]}
+        </span>
       </div>
       <p className="llf-sr-only" aria-live="polite" role="status">{announce}</p>
-      {error && <p role="alert" className="llf-error">{error}</p>}
-      {tickets === null && !error && <p className="llf-state">Loading tickets...</p>}
-      {tickets?.length === 0 && <p className="llf-state">No {status === "all" ? "" : status} tickets for {role}.</p>}
-      {tickets && tickets.length > 0 && (
-        <div className="llf-card llf-table-wrap">
-          <table>
-            <caption className="llf-state" style={{ textAlign: "left", padding: 0 }}>{plural(tickets.length, "ticket", "tickets")}</caption>
-            <thead><tr><th scope="col">Ticket</th><th scope="col">Circuit</th><th scope="col">Vendor</th><th scope="col" className="num">Monthly cost</th><th scope="col" className="num">Est. monthly savings</th><th scope="col">Agent</th><th scope="col">Status</th><th scope="col">Action</th></tr></thead>
-            <tbody>
-              {tickets.map((t) => (
-                <tr key={t.ticket_id}>
-                  <td><strong>{t.title}</strong><br /><small className="llf-muted">{t.ticket_id}</small>
-                    {t.rationale && <p className="llf-rationale">{t.rationale}</p>}</td>
-                  <td>{orNA(t.circuit_id)}</td>
-                  <td>{t.vendor_name ? <>{t.vendor_name}<br /><small className="llf-muted">{t.vendor_id}</small></> : orNA(t.vendor_id)}</td>
-                  <td className="num">{fmtUsd(t.monthly_cost)}</td><td className="num">{fmtUsd(t.est_monthly_savings)}</td>
-                  <td>{t.agent_name}</td><td><StatusBadge status={t.status} /></td>
-                  <td><div className="llf-actions">
-                    {t.status === "pending" ? (savingId === t.ticket_id ? (
-                      <button className="llf-btn" disabled aria-disabled="true">Saving...</button>
-                    ) : (<>
-                      <label className="llf-comment">Comment (optional)
-                        <input type="text" maxLength={2000} aria-label={`Comment (optional) for ${t.title}`} value={comments[t.ticket_id] ?? ""} disabled={savingId !== null}
+      <div className="llf-sheet-body">
+        <div className="llf-grid-wrap">
+          {error && <p role="alert" className="llf-error llf-grid-msg">{error}</p>}
+          {tickets === null && !error && <p className="llf-state">Loading tickets...</p>}
+          {tickets?.length === 0 && <p className="llf-state">No {status === "all" ? "" : status} tickets for {role}.</p>}
+          {tickets && tickets.length > 0 && (
+            <table className="llf-grid" ref={gridRef} onKeyDown={onGridKey}
+              aria-describedby="llf-grid-help">
+              <caption className="llf-sr-only">{plural(tickets.length, "ticket", "tickets")}</caption>
+              <thead><tr>
+                <td className="llf-rownum llf-corner" aria-hidden="true"><span className="llf-colletter" /><span className="llf-colname">1</span></td>
+                {Q_COLS.map((h, i) => (
+                  <th key={h} scope="col" className={`llf-colhead${Q_NUM_COLS.has(i) ? " num" : ""}${sel.c === i ? " llf-colhead--sel" : ""}`}>
+                    <span className="llf-colletter" aria-hidden="true">{colLetter(i)}</span><span className="llf-colname">{h}</span>
+                  </th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {tickets.map((t, r) => (
+                  <tr key={t.ticket_id}>
+                    <td className={`llf-rownum${sel.r === r ? " llf-rownum--sel" : ""}`} aria-hidden="true">{r + 2}</td>
+                    <td {...cell(r, 0, "llf-mono")}>{t.ticket_id}</td>
+                    <td {...cell(r, 1, "llf-cell--title")} title={t.title}><strong>{t.title}</strong></td>
+                    <td {...cell(r, 2, "llf-cell--wide")} title={t.rationale ?? undefined}>{orNA(t.rationale)}</td>
+                    <td {...cell(r, 3)}>{orNA(t.circuit_id)}</td>
+                    <td {...cell(r, 4)} title={cellText(t, 4) || undefined}>{t.vendor_name ? <>{t.vendor_name} <span className="llf-muted llf-mono">{t.vendor_id}</span></> : orNA(t.vendor_id)}</td>
+                    <td {...cell(r, 5, "num")}>{fmtUsd(t.monthly_cost)}</td>
+                    <td {...cell(r, 6, "num")}>{fmtUsd(t.est_monthly_savings)}</td>
+                    <td {...cell(r, 7)}>{t.agent_name}</td>
+                    <td {...cell(r, 8)}><StatusBadge status={t.status} /></td>
+                    <td {...cell(r, 9, "llf-cell--ctl")}>
+                      {t.status === "pending" ? (
+                        <input type="text" className="llf-cell-input" maxLength={2000} placeholder="Optional"
+                          aria-label={`Comment (optional) for ${t.title}`} value={comments[t.ticket_id] ?? ""} disabled={savingId !== null}
                           onChange={(e) => { const v = e.target.value; setComments((c) => ({ ...c, [t.ticket_id]: v })); }} />
-                      </label>
-                      <button className="llf-btn llf-btn--approve" disabled={savingId !== null} onClick={() => decide(t.ticket_id, t.title, "approved")} aria-label={`Approve ${t.title}`}>Approve</button>
-                      <button className="llf-btn llf-btn--reject" disabled={savingId !== null} onClick={() => decide(t.ticket_id, t.title, "rejected")} aria-label={`Reject ${t.title}`}>Reject</button>
-                    </>)) : (
-                      <button className="llf-btn" aria-label={`View evidence for ${t.title}`} onClick={() => { focusEvidence.current = true; showEvidence(t.ticket_id); }}>View evidence</button>
-                    )}
-                  </div></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      ) : <NotAvailable />}
+                    </td>
+                    <td {...cell(r, 10, "llf-cell--ctl")}><div className="llf-actions">
+                      {t.status === "pending" ? (savingId === t.ticket_id ? (
+                        <button className="llf-btn" disabled aria-disabled="true">Saving...</button>
+                      ) : (<>
+                        <button className="llf-btn llf-btn--approve" disabled={savingId !== null} onClick={() => decide(t.ticket_id, t.title, "approved")} aria-label={`Approve ${t.title}`}>Approve</button>
+                        <button className="llf-btn llf-btn--reject" disabled={savingId !== null} onClick={() => decide(t.ticket_id, t.title, "rejected")} aria-label={`Reject ${t.title}`}>Reject</button>
+                      </>)) : (
+                        <button className="llf-btn" aria-label={`View evidence for ${t.title}`} onClick={() => { focusEvidence.current = true; showEvidence(t.ticket_id); }}>View evidence</button>
+                      )}
+                    </div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <p id="llf-grid-help" className="llf-sr-only">Use arrow keys to move between cells. Press Enter to jump to the comment field or first button in a cell, and Escape to return to the cell. Tab moves through the comment fields and buttons.</p>
         </div>
-      )}
       {evidence && (
-        <section className="llf-card" aria-labelledby="ev-h">
-          <h3 id="ev-h" ref={evidenceHeading} tabIndex={-1}>Evidence for {evidence.ticket.ticket_id}</h3>
+        <aside className="llf-side" aria-labelledby="ev-h">
+          <div className="llf-side-head">
+            <h3 id="ev-h" ref={evidenceHeading} tabIndex={-1}>Evidence for {evidence.ticket.ticket_id}</h3>
+            <button type="button" className="llf-btn llf-btn--sm" onClick={() => setEvidence(null)} aria-label="Close evidence panel">Close</button>
+          </div>
           <dl className="llf-evidence">
             <dt>Agent</dt><dd>{evidence.agentIdentity.name}</dd>
             <dt>Agent identity</dt>
@@ -181,8 +264,9 @@ function ApprovalQueue() {
           <div className="llf-table-wrap"><table><caption className="llf-caption">Audit record ({plural(evidence.audit.length, "entry", "entries")})</caption><thead><tr><th scope="col">When</th><th scope="col">Action</th><th scope="col">Actor</th><th scope="col">Role</th><th scope="col">Details</th></tr></thead>
             <tbody>{evidence.audit.map((a, i) => <tr key={i}><td>{fmtWhen(a.at)}</td><td>{sentence(a.action)}</td><td>{a.actor}</td><td>{orNA(a.actor_role)}</td><td>{auditDetail(a.details)}</td></tr>)}</tbody>
           </table></div>
-        </section>
+        </aside>
       )}
+      </div>
     </section>
   );
 }
@@ -397,25 +481,25 @@ export default function App() {
     setTab(TABS[next]);
     tabRefs.current[next]?.focus();
   };
-  const [cfg, setCfg] = useState<Config>({ genieSpaceId: "", workspaceHost: "", mlflowExperimentId: "", metricView: "cdm_tmforum._metrics.margin_ledger_mv" });
+  const [cfg, setCfg] = useState<Config>({ genieSpaceId: "", workspaceHost: "", mlflowExperimentId: "", metricView: "" }); // filled from /api/config (app.yaml env)
   useEffect(() => { api<Config>("/api/config").then(setCfg).catch(() => undefined); }, []);
   return (
-    <>
-      <header className="llf-header"><span className="llf-mark" aria-hidden="true" /><h1>Lakelink Fiber | Margin Truth</h1></header>
-      <nav className="llf-tabs" role="tablist" aria-label="Sections">
+    <div className="llf-app">
+      <header className="llf-header"><span className="llf-mark" aria-hidden="true" /><h1>Lakelink Fiber | Margin Truth</h1><span className="llf-header-sub">{tab}</span></header>
+      <main>
+        <div role="tabpanel" id={panelId(active)} aria-labelledby={tabId(active)} tabIndex={0} className="llf-panel">
+          {tab === "Approval queue" && <ApprovalQueue />}
+          {tab === "Margin explorer" && <div className="llf-doc"><MarginExplorer metricView={cfg.metricView} genieSpaceId={cfg.genieSpaceId} /></div>}
+          {tab === "Margin Genie" && <div className="llf-doc"><MarginGenie cfg={cfg} /></div>}
+        </div>
+      </main>
+      <nav className="llf-tabs" role="tablist" aria-label="Sheets">
         {TABS.map((t, i) => (
           <button key={t} ref={(el) => { tabRefs.current[i] = el; }} id={tabId(i)} role="tab" className="llf-tab"
             aria-selected={tab === t} aria-controls={tab === t ? panelId(i) : undefined} tabIndex={tab === t ? 0 : -1}
             onClick={() => setTab(t)} onKeyDown={onTabKey}>{t}</button>
         ))}
       </nav>
-      <main>
-        <div role="tabpanel" id={panelId(active)} aria-labelledby={tabId(active)} tabIndex={0} className="llf-panel">
-          {tab === "Approval queue" && <ApprovalQueue />}
-          {tab === "Margin explorer" && <MarginExplorer metricView={cfg.metricView} genieSpaceId={cfg.genieSpaceId} />}
-          {tab === "Margin Genie" && <MarginGenie cfg={cfg} />}
-        </div>
-      </main>
-    </>
+    </div>
   );
 }
