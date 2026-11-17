@@ -4,7 +4,7 @@ Owner: @data-planner (v1.0), @data-analyst (v1.1) · Tasks: DP-GENIE-ONE-FALLBAC
 
 This is a PROPOSAL only. The CEO must approve it before anything is copied into `/Workspace/.genie_workspace_instructions.md`. No agent edits that file.
 
-Why this exists: Genie One finds the margin assets through (a) certified metric views with full comments, (b) the Discover domain `lakelink_margin` (2abc9194-aed9-4088-bfa6-4b4d33870ebd) and its 16 Glossary Pages (DRAFT), (c) Margin Genie, and (d) this proposed workspace instruction block. v1.1 note: the domain quota gate cleared on 2026-11-13 (@pm run #9), and all 5 margin_ metric views are live and certified.
+Why this exists: Genie One finds the margin assets through (a) certified metric views with full comments, (b) Discover: margin tables, metric views, dashboard, Margin Genie and app are curated under domain "Lakelink Fiber" (30075762-3635-498b-a3fb-c5decf5b5333) sub-domains Finance Margin / Operations Margin / Sales Margin / Marketing Margin (20 UC objects tagged 8/6/5/1, 0 lakelink_margin tags); Glossary Pages = 16 PUBLISHED + Rate Variance DRAFT (off stage) still in legacy domain `lakelink_margin` (2abc9194-aed9-4088-bfa6-4b4d33870ebd) pending the CEO UI move, plus 6 PUBLISHED pages in the Lakelink Fiber tree (state probed 2026-11-17 ~07:10 UTC by @data-planner), (c) Margin Genie, and (d) this proposed workspace instruction block. v1.1 note: the domain quota gate cleared on 2026-11-13 (@pm run #9), and all 5 margin_ metric views are live and certified.
 
 ## 1. Proposed block for /Workspace/.genie_workspace_instructions.md (CEO approval required)
 
