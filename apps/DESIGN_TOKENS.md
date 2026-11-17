@@ -95,8 +95,22 @@ Series 2 and 5 are both warm hues, so charts with 4 or more series must use dire
 * Answers show money in USD with 2 decimals and percentages with 1 decimal, matching the metric view formats and DEC-030.
 * Copy reviewed under DA-GENIE-COPY-REVIEW (2026-11-12, PASS with changes); remediation in DSN-GENIE-COPY-R1.
 
+## 10. Workbook surface tokens (approval queue)
+
+The workbook (spreadsheet) metaphor in the approval queue uses these additional CSS variables. All four live in `:root` alongside the core tokens.
+
+| Token | Hex | Use | Contrast (measured) | Rule |
+| --- | --- | --- | --- | --- |
+| `--llf-grid` | #E6E2DC | Grid lines between cells | 1.77 on #FFF | Decorative only |
+| `--llf-grid-head` | #F3F1ED | Column-letter and row-number gutters | - | Background surface |
+| `--llf-select` | #007A52 | Selected cell outline and highlighted gutter | 4.77 on grid-head | Same as accent-ink |
+| `--llf-select-tint` | #E8F5EF | Selected cell fill | - | Background only |
+
+White text on `--llf-select` (#007A52) passes AA at 5.38:1.
+
 ## Change log
 
+* v1.4 2026-11-17 @designer: section 10 added — documents 4 workbook surface tokens (--llf-grid, --llf-grid-head, --llf-select, --llf-select-tint) found during DSN-REVIEW-APP-01F1E21C-1117 review; all contrast checks pass.
 * v1.3 2026-11-14 @designer: section 3 currency format updated from 0dp to 2dp per DEC-030; section 9 Genie answer format aligned to 2dp; compact KPI rule clarified.
 * v1.2 2026-11-12 @designer: section 8 dashboard title aligned to "Lakelink Fiber Margin Truth" (bundle yml) and page 2 renamed "$1B Wall tracker"; adds the red/green 1.20:1 rule and a link to resources/dashboard_layout_spec.md.
 * v1.1 2026-11-12 @designer: section 7 adds the Contribution Margin % naming rule and the title-case category value rule; section 9 adds the approved Genie description and the ordered sample questions (DA-GENIE-COPY-REVIEW).

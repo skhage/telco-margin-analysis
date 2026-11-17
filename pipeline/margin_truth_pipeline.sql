@@ -223,3 +223,63 @@ SELECT
 FROM base b
 JOIN tot  t  USING (ledger_month)
 LEFT JOIN pw USING (ledger_month);
+
+-- ---------------------------------------------------------------------------
+-- SOX aggregate layer. margin_billing and margin_carrier_invoices are SOX in-scope:
+-- ABAC policy margin_sox_detail_rows hides every line from users outside the
+-- lakelink-sox-finance group. These MVs refresh as the pipeline run-as identity
+-- (excepted from the policies), so they hold totals over ALL lines, at a grain with
+-- no line, customer, circuit or invoice. Any cell with fewer than 5 lines is folded
+-- into a 'Suppressed (<5 lines)' bucket so totals still tie to the sub-ledger.
+-- Tagged fin_sox_scope = supporting, so no SOX policy applies when querying them.
+-- ---------------------------------------------------------------------------
+CREATE OR REFRESH MATERIALIZED VIEW margin_sox_billing_monthly (
+  billing_month DATE NOT NULL COMMENT 'Billing month, first day of the month. Synonyms: month, period.',
+  segment STRING COMMENT 'Customer segment, or Suppressed (<5 lines) when the cell has fewer than 5 billing lines. Synonyms: market segment.',
+  region STRING COMMENT 'Sales region, or Suppressed (<5 lines) when the cell has fewer than 5 billing lines. Synonyms: territory.',
+  billing_line_count BIGINT COMMENT 'Number of billing lines in the cell.',
+  billed_amount_usd DECIMAL(28,2) COMMENT 'Total billed amount over all billing lines in the cell, US dollars (SOX sub-ledger total). Synonyms: billings, revenue, sales.',
+  expected_amount_usd DECIMAL(28,2) COMMENT 'Total amount the contract rates say should have been billed, US dollars.',
+  leakage_usd DECIMAL(28,2) COMMENT 'expected_amount_usd minus billed_amount_usd, US dollars. Positive = under-billed. Synonyms: revenue leakage.'
+)
+COMMENT 'SOX aggregate (DEC-SOX-AGG): monthly billing totals by segment and region over ALL margin_billing lines, for users who may not see SOX line detail. Ties to margin_billing in total. Cells under 5 lines are suppressed into one bucket.'
+AS
+WITH g AS (
+  SELECT b.billing_month, c.segment, c.region, COUNT(*) AS n,
+         SUM(b.billed_amount_usd) AS billed, SUM(b.expected_amount_usd) AS expected
+  FROM ${catalog}.${schema}.margin_billing b
+  LEFT JOIN ${catalog}.${schema}.margin_customers c USING (customer_id)
+  GROUP BY ALL
+)
+SELECT billing_month,
+       CASE WHEN n < 5 THEN 'Suppressed (<5 lines)' ELSE segment END AS segment,
+       CASE WHEN n < 5 THEN 'Suppressed (<5 lines)' ELSE region END AS region,
+       SUM(n) AS billing_line_count,
+       CAST(SUM(billed) AS DECIMAL(28,2)) AS billed_amount_usd,
+       CAST(SUM(expected) AS DECIMAL(28,2)) AS expected_amount_usd,
+       CAST(SUM(expected) - SUM(billed) AS DECIMAL(28,2)) AS leakage_usd
+FROM g
+GROUP BY ALL;
+
+CREATE OR REFRESH MATERIALIZED VIEW margin_sox_carrier_spend_monthly (
+  invoice_month DATE NOT NULL COMMENT 'Carrier invoice month, first day of the month. Synonyms: month, period.',
+  vendor_id STRING COMMENT 'Carrier vendor id (references margin_vendors), or Suppressed (<5 lines). Synonyms: carrier, supplier.',
+  vendor_name STRING COMMENT 'Carrier display name, or Suppressed (<5 lines).',
+  invoice_line_count BIGINT COMMENT 'Number of carrier invoice lines in the cell.',
+  paid_amount_usd DECIMAL(28,2) COMMENT 'Total paid to the carrier over all invoice lines in the cell, US dollars (SOX AP sub-ledger total). Synonyms: off-net spend, carrier cost.'
+)
+COMMENT 'SOX aggregate (DEC-SOX-AGG): monthly carrier spend by vendor over ALL margin_carrier_invoices lines, for users who may not see SOX line detail or contract rates. Ties to margin_carrier_invoices in total. Cells under 5 lines are suppressed into one bucket.'
+AS
+WITH g AS (
+  SELECT i.invoice_month, i.vendor_id, v.vendor_name, COUNT(*) AS n, SUM(i.paid_amount_usd) AS paid
+  FROM ${catalog}.${schema}.margin_carrier_invoices i
+  LEFT JOIN ${catalog}.${schema}.margin_vendors v USING (vendor_id)
+  GROUP BY ALL
+)
+SELECT invoice_month,
+       CASE WHEN n < 5 THEN 'Suppressed (<5 lines)' ELSE vendor_id END AS vendor_id,
+       CASE WHEN n < 5 THEN 'Suppressed (<5 lines)' ELSE vendor_name END AS vendor_name,
+       SUM(n) AS invoice_line_count,
+       CAST(SUM(paid) AS DECIMAL(28,2)) AS paid_amount_usd
+FROM g
+GROUP BY ALL;
