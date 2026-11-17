@@ -170,11 +170,11 @@ Optional guardrail proof (agent_notes 1519/1743): request 9b07ddc1-7b6f-4fe9-868
 
 The SDK list `w.service_principals.list(filter='displayName eq "lakelink-margin-grooming-agent"')` returned **0 rows** at 2026-11-14 20:23:21 UTC (also 0 rows at ~19:24 UTC), so the dedicated agent service principal does not exist yet. Unless the SP gate clears by its cutoff, say:
 
-> "In this workspace the agent runs under the presenter's identity, with the tag identity_mode = user_fallback. The trace, the Unity Gateway usage rows and the audit log all record that same identity for every step. In production, each agent gets its own service principal with least-privilege grants, and the same three records then show that principal."
+> "In this demo the agent runs as the presenter's identity; in production each agent gets its own service principal." (DEC-102 row 4)
 
 Do not claim on stage that a dedicated agent service principal made these calls. CEO_ACTION_SHEET.md lines that use this identity wording: l.88 (S6 GO-FALLBACK: say 'user identity', not 'service principal'), l.110 (S6 l.88 talk-track default), l.9 and l.57 (gate 3 / I6 Agent SP, Command B l.25-33).
 
-**Click path fallback (if the MLflow UI does not load):** read trace A's span table, then the audit table. Say: "Every step has a record: Genie, the scoring function, the model call through the gateway, with guardrails checked each time."
+**Click path fallback (if the MLflow UI does not load):** read trace A's span table, then the audit table. Say: "Every step has a record: Genie, the scoring function, the model call through the gateway." (Guardrail clause cut, DEC-102 row 5: no guardrail or approved-model claim on stage.)
 
 ---
 
@@ -296,7 +296,7 @@ Tie-out: the same three circuits in `cdm_tmforum.revenue_assurance.margin_score_
 
 **Do not** quote the exact portfolio CM from the app explorer (build 01f1df66 shows 0 dp; DEC-040). Quote it from Margin Genie or the dashboard. MV check this run: MEASURE(contribution_margin) = 2,375,095,705.09 = raw margin_ledger_allocated 2,375,095,705.09 (517,032 rows).
 
-## S6b - Sales sees only its own accounts (row filter; owner @data-engineer, verified read-only 2026-11-14 ~22:20 UTC, COO-Q-20261114-94)
+## S6b - Sales row filter policy (DEC-102 row 6; owner @data-engineer, verified read-only 2026-11-14 ~22:20 UTC, COO-Q-20261114-94)
 
 Warehouse bf0baa637e887c80. Statement ids are real execution ids, not header times.
 
@@ -305,7 +305,7 @@ Warehouse bf0baa637e887c80. Statement ids are real execution ids, not header tim
 * Sales path (filter function evaluated as West rep sales.west@lakelinkfiber.example, is_sales = true): table-level only, the ledger table returns 103,176 of 517,032 rows, 0 out-of-region rows (stmt 01f1e078-a673-1c4a-bbc1-32004e290e45). An unassigned Sales principal sees 0 customers (stmt 01f1e078-a8ed-1994-a2ac-b7102e90d992). DEC-063 (2026-11-15): the presenter-identity West split (stmt 01f1e078-a4e1-1b88-958f-a79a77298156; figure intentionally not printed) uses global cost-to-serve coefficients. It is NOT what a Sales identity gets through margin_ledger_mv or Margin Genie: margin_ledger_allocated is a VIEW that inherits the margin_ledger_v2 filter inside its driver totals, so a Sales-scoped CM is mis-allocated. Never quote a Sales CM on stage. Post-demo fix: DE-POST-DEMO-CTS-DRIVER-TOTALS. Re-verified 2026-11-15 ~17:15 UTC: 517,032 / 103,176 rows, MV CM 2,375,095,705.09.
 * Tie-out: the 5 regions sum to 2,375,095,705.09 and 517,032 rows (stmt 01f1e078-a7c8-1472-873b-928118610bd5).
 
-**Fallback (no live Sales identity on stage):** Show the DESCRIBE row filter line, then read: "Sales reps are filtered where the data lives. This one governed filter sits on the ledger, customer and contract tables. A West Sales rep querying the ledger sees 103,176 of 517,032 rows, only their own accounts. Finance sees all of them." Do not quote a Sales contribution margin figure, and do not say the metric view or Margin Genie applies the filter. Q&A only: "On stage, Margin Genie runs as the presenter. Per-rep margin through the metric view is the next step." Do not log in as a synthetic rep, because the lakelinkfiber.example principals are not workspace users (DEC-063 wording B).
+**Fallback (no live Sales identity on stage):** Show the DESCRIBE row filter line, then read (DEC-102 row 6): "A row filter in Unity Catalog limits Sales to its own territory accounts. Here is the policy." Show the policy definition only; do not show or quote a Sales-user view (the 103,176-row West rep result is not shown on stage). Do not quote a Sales contribution margin figure, and do not say the metric view or Margin Genie applies the filter. Q&A only: "On stage, Margin Genie runs as the presenter. Per-rep margin through the metric view is the next step." Do not log in as a synthetic rep, because the lakelinkfiber.example principals are not workspace users (DEC-063 wording B).
 
 ## S5-CUE - Live grooming run: pre-start cue and 65s cutoff (owner @app-developer, from COO-Q-20261115-22 / -24, written 2026-11-15 ~06:40 UTC, updated 2026-11-15 ~08:30 UTC for DEC-057 + DSN-REVIEW-S5-CUE-R56)
 
