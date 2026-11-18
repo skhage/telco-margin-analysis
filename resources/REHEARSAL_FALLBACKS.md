@@ -227,6 +227,8 @@ Appended at the end on purpose so the S2/S3/S6/S7 line refs in CEO_ACTION_SHEET 
 
 Total loss across the 2 families: -6,965,008.62. Raw tie-out: margin_ledger_allocated with ledger_month in [2026-07-01, 2026-10-01), grouped by product_family, family_class, HAVING SUM(revenue_usd - network_expense_usd - cost_to_serve_usd) < 0 -> the same 2 rows to the cent (15,996 and 540 ledger rows).
 
+**S1 Q&A backup - "Why IP-VPN?" (DEC-133, DEC-143(3); owner @data-analyst, DA-S1-IPVPN-QA-BACKUP-1118, verified read-only 2026-11-18 ~08:3x UTC; not on CEO_ACTION_SHEET):** "Both products losing money are in our legacy class: IP-VPN and Legacy Voice. In the Lakelink Fiber catalog IP-VPN is a legacy family. Last quarter network expense took 79 cents of every revenue dollar, two thirds of it paid to off-net carriers, and cost to serve took another 53 cents, driven by legacy care volume of about 1.5 tickets per circuit-month. Legacy Voice has the worse rate, minus 36 percent, but it is a small book." Evidence (Q3 2026, margin_ledger_mv = raw margin_ledger_allocated to the cent): IP-VPN revenue 21,113,431.95, network expense 16,581,523.71 (78.5%; off-net 10,872,502.86 = 65.6% of it), cost to serve 11,247,384.12 (53.3%), CM -6,715,475.88; CM before cost to serve +4,531,908.24, so the loss appears only after cost to serve. Tickets 1.490 per circuit-month (strategic families 0.249-0.253, DEC-016). Allocation weights are the same for every family, so the loss comes from the planted synthetic driver volumes, not from a rule-weight setting. Margin Genie conv 01f1e328b1711224a34159bb7ff89ba0 (stmt 01f1e328-b511-198b-b910-e8a06bd20188) leads with IP-VPN, then Legacy Voice, both labelled Legacy.
+
 ### S4 Ops - expected answer (margin_offnet_spend_mv, is_grooming_candidate)
 
 47 grooming candidates. Annual off-net cost (what we pay) = 1,152,342.12 (monthly 96,028.51). Estimated annual savings if moved on-net = 412,539.96 (monthly 34,378.33). Never label 412,539.96 as spend (DEC-026).
@@ -307,7 +309,7 @@ Warehouse bf0baa637e887c80. Statement ids are real execution ids, not header tim
 
 **Fallback (no live Sales identity on stage):** Show the DESCRIBE row filter line, then read (DEC-102 row 6): "A row filter in Unity Catalog limits Sales to its own territory accounts. Here is the policy." Show the policy definition only; do not show or quote a Sales-user view (the 103,176-row West rep result is not shown on stage). Do not quote a Sales contribution margin figure, and do not say the metric view or Margin Genie applies the filter. Q&A only: "On stage, Margin Genie runs as the presenter. Per-rep margin through the metric view is the next step." Do not log in as a synthetic rep, because the lakelinkfiber.example principals are not workspace users (DEC-063 wording B).
 
-## S5-CUE - Live grooming run: pre-start cue and 65s cutoff (owner @app-developer, from COO-Q-20261115-22 / -24, written 2026-11-15 ~06:40 UTC, updated 2026-11-15 ~08:30 UTC for DEC-057 + DSN-REVIEW-S5-CUE-R56)
+## [SUPERSEDED by DEC-145(d): stop rule of record is 75s at scene5_stage_run_config l.107] S5-CUE - Live grooming run: pre-start cue and 65s cutoff (owner @app-developer, from COO-Q-20261115-22 / -24, written 2026-11-15 ~06:40 UTC, updated 2026-11-15 ~08:30 UTC for DEC-057 + DSN-REVIEW-S5-CUE-R56)
 
 Appended at the end so earlier line refs stay valid. This section is the presenter copy of the cue. `apps/margin-truth/SCENE5_CLICK_SCRIPT.md` is NOT edited (notes 1805/2182, DEC-055(2)); its md5 stays 2d21dedc3522. The click script describes the pre-run path (3 pending tickets). This section adds the optional live run in front of it.
 
@@ -341,10 +343,10 @@ Line numbers below were re-checked by grep on 2026-11-17 ~20:4x UTC against this
 | S2 Where the answer comes from | Pipeline ids, not names; ccea7e91 excluded (DEC-029a) | this file l.33 |
 | S3 Why trusted | Read-only simulation: care ticket weight 0.70 -> 0.90 gives 2,360,713,702.39 (DEC-027(3)) | CEO_ACTION_SHEET l.71, l.85, l.104; this file l.58 |
 | S4 Ops / Sales / Marketing | Margin Genie benchmark expected answers | this file l.206-270 |
-| S5 From insight to action | Hero approve trace `tr-2b088edfed85d22b2db662a6c0a7c68e` (wrote GROOM-1e655052ef, dry_run=false, OK 51.65 s) + stills pack `apps/margin-truth/stills/` | Trace open path: this file l.354. CEO_ACTION_SHEET l.87 still cites the stale DRY_RUN id (@pm owns that edit). Stills pack: this file l.293 |
+| S5 From insight to action | Hero approve trace `tr-2b088edfed85d22b2db662a6c0a7c68e` (wrote GROOM-1e655052ef, dry_run=false, OK 51.65 s) + stills pack `apps/margin-truth/stills/` | Trace open path: this file l.354. CEO_ACTION_SHEET l.88 (tr-2b088edf). Stills pack: this file l.293 |
 | S6 Prove it to audit | Trace A / Trace B + audit query | this file l.65-180 |
 | S7 $1B Wall cards | Card answer key | this file l.181-205 |
-| DEC-120(1) S5 approve | Hero trace tr-2b088edfed85d22b2db662a6c0a7c68e (wrote GROOM-1e655052ef) + recorded clip (clip does not exist, see below) | this file l.354; CEO_ACTION_SHEET l.87 (stale id, @pm) |
+| DEC-120(1) S5 approve | Hero trace tr-2b088edfed85d22b2db662a6c0a7c68e (wrote GROOM-1e655052ef) + recorded clip (clip does not exist, see below) | this file l.354; CEO_ACTION_SHEET l.88 (tr-2b088edf) |
 | DEC-120(2) Genie One S1 capture | DEC-029b: Margin Genie on stage. Pass bar amended by DEC-127 (IP-VPN -6,715,475.88, Legacy Voice -249,532.74 for 2026-07-01) | CEO_ACTION_SHEET l.11, l.35, l.59 |
 | DEC-120(3) Dashboard render ids | Dataset SQL statement ids + screenshot (CEO-only) | DEC-120(3) only; not written in either file |
 | DEC-120(4) Timed S1-S7 run | Recorded S1-S6 walkthrough (does NOT exist) -> live S1-S6 with the stills pack | CEO_ACTION_SHEET l.127; this file l.3 (agents cannot capture screenshots, DEC-025) |
@@ -354,3 +356,7 @@ Line numbers below were re-checked by grep on 2026-11-17 ~20:4x UTC against this
 **Hero approve trace `tr-2b088edfed85d22b2db662a6c0a7c68e`: open path (corrected 2026-11-17 ~21:5x UTC, DSN-S5-FALLBACK-TRACE-ID-1117).** The approve leg uses it only as a fallback (DEC-120(1)). Verified by `mlflow.get_trace`: state OK, 51,654 ms, tags dry_run=false and mlflow.user = the presenter identity, and the draft_savings_ticket span output is ticket GROOM-1e655052ef status pending (the pre-run ticket at l.84). Open path: Experiment 1235449331932066 -> Traces tab -> paste the full id, or https://fevm-cmegdemos.cloud.databricks.com/ml/experiments/1235449331932066/traces?selectedEvaluationId=tr-2b088edfed85d22b2db662a6c0a7c68e . Do NOT use the earlier DRY_RUN trace for circuit 35360 (would_insert GROOM-f14ea57020, wrote nothing); it does not show GROOM-1e655052ef.
 
 **Timed open (<10 s): NOT VERIFIED (DEC-125(c)).** It needs an attended check at the DEC-120 slot.
+
+## Stage Q&A - asset sprawl (DEC-144(2), owner @designer, DSN-SPRAWL-QA-LINE-1118, written 2026-11-18 ~11:4x UTC, doc-only; not on CEO_ACTION_SHEET)
+
+**If asked "How many assets did this take?":** "One app, one dashboard, one Margin Genie, one pipeline of record (20960984). A second pipeline, ccea7e91, is idle with 0 tables and is removed on Nov 20 (DEC-138)."
