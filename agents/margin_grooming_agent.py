@@ -436,7 +436,11 @@ def run_agent(task, max_turns=8):
                     "cm_statement_id": ref.get("cm_statement_id")}
         for tc in tcs:
             fn = tc["function"]["name"]
-            res = DISPATCH[fn](**json.loads(tc["function"]["arguments"] or "{}"))
+            try:
+                res = DISPATCH[fn](**json.loads(tc["function"]["arguments"] or "{}"))
+            except TypeError as e:  # COO-Q-20261118-35: empty-args call -> tell the model, do not crash
+                mlflow.update_current_trace(tags={"guard_fired": "true"})
+                res = {"error": f"invalid arguments for {fn}: {e}; call again with all required fields"}
             calls.append(fn)
             messages.append({"role": "tool", "tool_call_id": tc["id"], "content": json.dumps(res, default=str)})
     return {"final": "max_turns reached", "tool_calls": calls}
