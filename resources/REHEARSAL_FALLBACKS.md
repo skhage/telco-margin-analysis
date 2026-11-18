@@ -272,7 +272,7 @@ Raw tie-out: margin_ledger_allocated grouped by segment (SUM CM, COUNT DISTINCT 
 
 Appended at the end so earlier line refs stay valid. No deploy, no approve/reject, no ticket DML, no new asset, no ledger row (PM-FB-S5-QUEUE-STILL).
 
-**Live app:** `lakelink-margin-truth`, w.apps.get at 2026-11-14 20:28 UTC = RUNNING / compute ACTIVE, active deployment `01f1df6665471f5ebf858b80eb08a2bd` (created 2026-11-13T13:30:30Z), pending deployment none. URL `https://lakelink-margin-truth-7474656585748611.aws.databricksapps.com`.
+**Live app:** `lakelink-margin-truth`, GET /api/2.0/apps at 2026-11-17 ~11:2x UTC = RUNNING / compute ACTIVE, active deployment `01f1e21cc3511220b5dfc5ea71aa275f` (created 2026-11-17T00:20:58Z, SUCCEEDED), no pending deployment returned (DEC-108). Open the app by name, never by deployment id. URL `https://lakelink-margin-truth-7474656585748611.aws.databricksapps.com`.
 
 **Queue source:** app Lakebase project `telco-margin-analysis-app`, endpoint `projects/telco-margin-analysis-app/branches/production/endpoints/primary` (host resolved via get_endpoint = `ep-calm-king-d2mq878u...`, ACTIVE), table `public.approval_tickets`. Read in this run: 4 rows, all `pending`; `public.approval_audit` has 4 rows (max audit_id 6), untouched.
 
@@ -286,7 +286,7 @@ Appended at the end so earlier line refs stay valid. No deploy, no approve/rejec
 
 Tie-out: the same three circuits in `cdm_tmforum.revenue_assurance.margin_score_onnet_move(NULL)` return monthly off-net cost and est. monthly savings equal to the cent (1,364.58/1,357.85; 2,880.05/879.34; 2,469.86/469.00). Vendor names from `margin_vendors`. Approver roles: Ops, AP, FP&A (server/index.ts l.26); approve only flips a `pending` row for the matching role, else HTTP 409 (l.204-209).
 
-**Live click path (if the app loads):** Approval queue -> role Ops -> open GROOM-1e655052ef (10211) -> Approve with comment -> the evidence panel shows trace tr-2b088edf..., agent `lakelink-margin-grooming-agent`, identity_mode user_fallback (no agent SP, see S6 identity wording), and the new approval_audit row. Say: "Two tickets remain" (45040, 98532 stay pending). Then go to S6 with trace A.
+**Live click path (if the app loads):** Approval queue -> role Ops -> open GROOM-1e655052ef (10211) -> Approve with comment -> the evidence panel shows trace tr-2b088edf..., agent `lakelink-margin-grooming-agent`, identity_mode user_fallback (no agent SP, see S6 identity wording), and the new approval_audit row. Say: "The approved ticket leaves the Ops pending queue" and read the remaining pending count from the live Pending list (no fixed count, DEC-115; 98532 GROOM-6d8f8ce31e was rejected 11-17 15:28Z). Then go to S6 with trace A.
 
 **Fallback if the app does not load or misbehaves:**
 
@@ -294,7 +294,7 @@ Tie-out: the same three circuits in `cdm_tmforum.revenue_assurance.margin_score_
 2. Read the 3-row table above aloud. Say: "The agent found these circuits, Margin Genie confirmed them, and Ops approves before anything changes. Nothing moves without a human decision."
 3. Rollback pointer: see `apps/margin-truth/REDEPLOY.md` l.16-20 (owner, cutoff Nov 16 12:00 CT, default = explorer OUT of scenes 1-7, dashboard explorer page used) and l.34 (Verify after deploy). A rollback section in REDEPLOY.md is still pending (DSN-F-S5-ROLLBACK-VERIFY-R1). The call is POST `/api/2.0/apps/lakelink-margin-truth/rollback` to deployment `01f1df6665471f5ebf858b80eb08a2bd`; it returns a NEW deployment id with `rollback_of_deployment_id`, so verify on that field, not on the id (agent_notes 1778, 1837).
 
-**Do not** quote the exact portfolio CM from the app explorer (build 01f1df66 shows 0 dp; DEC-040). Quote it from Margin Genie or the dashboard. MV check this run: MEASURE(contribution_margin) = 2,375,095,705.09 = raw margin_ledger_allocated 2,375,095,705.09 (517,032 rows).
+**Do not** quote the exact portfolio CM from the app explorer (not a stage surface for exact CM on any build; DEC-040). Quote it from Margin Genie or the dashboard. MV check this run: MEASURE(contribution_margin) = 2,375,095,705.09 = raw margin_ledger_allocated 2,375,095,705.09 (517,032 rows).
 
 ## S6b - Sales row filter policy (DEC-102 row 6; owner @data-engineer, verified read-only 2026-11-14 ~22:20 UTC, COO-Q-20261114-94)
 
@@ -330,3 +330,27 @@ Appended at the end so earlier line refs stay valid.
 2. **Warm-up step (operator, once, before scene 1):** in the SAME session used for the live run, import `agents/margin_grooming_agent.py`, set `DRY_RUN=True`, and run the stage prompt once on circuit 35360. It writes nothing. Start it at least 5 minutes before scene 5 so it finishes about 60-90 s later (cold). Then set `DRY_RUN=False` for the single live start in S5-CUE line 314. Do not restart the session between the warm-up and the live run. This timing comes from the cold vs warm traces above; it was not re-measured in a rehearsal.
 3. **If no warm-up was run:** the live run may hit the deadline and write nothing. Follow S5-CUE line 316 (go to pre-run ticket GROOM-1e655052ef, circuit 10211).
 4. **Cost/vendor guard (ML-GUARD-COST-VENDOR-RECHECK):** `draft_savings_ticket` now refuses a ticket unless monthly_cost and est_monthly_savings match `margin_score_onnet_move` within 0.01 USD AND vendor_id matches exactly (`guard_mismatch()`). DRY_RUN evidence on 35360 (fn: vendor 00100000000264PAAA, 2513.61 / 2307.07, score 95): correct values -> would_insert tr-0737c00aebadddbcaa6feb3d958ae1c6; monthly_cost +100 -> refused 'monthly_cost mismatch' tr-de84f5d6f32bf88363a27505d225afb5; wrong vendor -> refused 'vendor_id mismatch' tr-f8381c2b386df41f0cdbcad54d779fb3. Commit: DEVOPS-COMMIT-ML-GUARD; md5 check: QA-VERIFY-ML-GUARD-MD5 (deadline 22:00 UTC Nov 15, DEC-060).
+
+## Fallback index (DEC-125) (owner @designer, DSN-FALLBACK-INDEX-DEC125-1117, written 2026-11-17 ~20:4x UTC, doc-only)
+
+Line numbers below were re-checked by grep on 2026-11-17 ~20:4x UTC against this file before this section was added (333 lines, md5 326f270c22e7) and against `resources/CEO_ACTION_SHEET.md` (130 lines, md5 7916d149865c). Correction to DEC-125(a): in this file, DEC-029b has 0 hits, and l.98 / l.102 / l.110 / l.114 are trace-table rows, not fallback statements. The real locations are listed below.
+
+| Scene / leg | Fallback | Where it is written (file l.N) |
+| --- | --- | --- |
+| S1 The question | Margin Genie `01f1df115a08164aab3ae5f6faac807c` only, no Genie One claim (DEC-029b) | CEO_ACTION_SHEET l.69, l.83, l.102; this file l.210 (space + eval 01f1e02d 13/13) |
+| S2 Where the answer comes from | Pipeline ids, not names; ccea7e91 excluded (DEC-029a) | this file l.33 |
+| S3 Why trusted | Read-only simulation: care ticket weight 0.70 -> 0.90 gives 2,360,713,702.39 (DEC-027(3)) | CEO_ACTION_SHEET l.71, l.85, l.104; this file l.58 |
+| S4 Ops / Sales / Marketing | Margin Genie benchmark expected answers | this file l.206-270 |
+| S5 From insight to action | Hero approve trace `tr-2b088edfed85d22b2db662a6c0a7c68e` (wrote GROOM-1e655052ef, dry_run=false, OK 51.65 s) + stills pack `apps/margin-truth/stills/` | Trace open path: this file l.354. CEO_ACTION_SHEET l.87 still cites the stale DRY_RUN id (@pm owns that edit). Stills pack: this file l.293 |
+| S6 Prove it to audit | Trace A / Trace B + audit query | this file l.65-180 |
+| S7 $1B Wall cards | Card answer key | this file l.181-205 |
+| DEC-120(1) S5 approve | Hero trace tr-2b088edfed85d22b2db662a6c0a7c68e (wrote GROOM-1e655052ef) + recorded clip (clip does not exist, see below) | this file l.354; CEO_ACTION_SHEET l.87 (stale id, @pm) |
+| DEC-120(2) Genie One S1 capture | DEC-029b: Margin Genie on stage. Pass bar amended by DEC-127 (IP-VPN -6,715,475.88, Legacy Voice -249,532.74 for 2026-07-01) | CEO_ACTION_SHEET l.11, l.35, l.59 |
+| DEC-120(3) Dashboard render ids | Dataset SQL statement ids + screenshot (CEO-only) | DEC-120(3) only; not written in either file |
+| DEC-120(4) Timed S1-S7 run | Recorded S1-S6 walkthrough (does NOT exist) -> live S1-S6 with the stills pack | CEO_ACTION_SHEET l.127; this file l.3 (agents cannot capture screenshots, DEC-025) |
+
+**Recorded S1-S6 walkthrough: DOES NOT EXIST (DEC-125(b)).** Only the CEO can record it (DEC-025). The owner is the CEO, at the DEC-120 slot on 2026-11-18 15:00-16:05 UTC. If it is not recorded, the timed-run leg falls back to the live S1-S6 run with the stills pack, and @pm states that gap at go/no-go.
+
+**Hero approve trace `tr-2b088edfed85d22b2db662a6c0a7c68e`: open path (corrected 2026-11-17 ~21:5x UTC, DSN-S5-FALLBACK-TRACE-ID-1117).** The approve leg uses it only as a fallback (DEC-120(1)). Verified by `mlflow.get_trace`: state OK, 51,654 ms, tags dry_run=false and mlflow.user = the presenter identity, and the draft_savings_ticket span output is ticket GROOM-1e655052ef status pending (the pre-run ticket at l.84). Open path: Experiment 1235449331932066 -> Traces tab -> paste the full id, or https://fevm-cmegdemos.cloud.databricks.com/ml/experiments/1235449331932066/traces?selectedEvaluationId=tr-2b088edfed85d22b2db662a6c0a7c68e . Do NOT use the earlier DRY_RUN trace for circuit 35360 (would_insert GROOM-f14ea57020, wrote nothing); it does not show GROOM-1e655052ef.
+
+**Timed open (<10 s): NOT VERIFIED (DEC-125(c)).** It needs an attended check at the DEC-120 slot.
