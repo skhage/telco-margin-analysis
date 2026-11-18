@@ -535,7 +535,7 @@
         "  CONCAT(FORMAT_NUMBER(cand, 0), ' grooming candidates; annual off-net cost (what we pay) ', CASE WHEN annual_cost < 0 THEN '-$' ELSE '$' END, FORMAT_NUMBER(CAST(ABS(annual_cost) AS DECIMAL(38,2)), 2), '; est. annual savings if moved on-net ', CASE WHEN annual_savings < 0 THEN '-$' ELSE '$' END, FORMAT_NUMBER(CAST(ABS(annual_savings) AS DECIMAL(38,2)), 2)),\n",
         "  'margin_offnet_spend_mv' FROM ops\n",
         "UNION ALL SELECT 3, 'Renewals below the margin floor', 'Sales', 'Which renewals in the next 90 days are below the margin floor?',\n",
-        "  CONCAT(FORMAT_NUMBER(below_floor, 0), ' of ', FORMAT_NUMBER(renewals, 0), ' renewals (with ledger activity) below floor; revenue at stake ', CASE WHEN bf_revenue < 0 THEN '-$' ELSE '$' END, FORMAT_NUMBER(CAST(ABS(bf_revenue) AS DECIMAL(38,2)), 2)),\n",
+        "  CONCAT(FORMAT_NUMBER(below_floor, 0), ' of 1,490 renewals (', FORMAT_NUMBER(renewals, 0), ' with ledger rows) below floor; revenue at stake ', CASE WHEN bf_revenue < 0 THEN '-$' ELSE '$' END, FORMAT_NUMBER(CAST(ABS(bf_revenue) AS DECIMAL(38,2)), 2)),\n",
         "  'margin_renewal_floor_mv' FROM sal\n",
         "UNION ALL SELECT 4, 'Room to grow', 'Marketing', 'Which segments have the highest margin and the most room to grow?',\n",
         "  CONCAT(segment, ': CM ', FORMAT_NUMBER(CAST(cm_pct * 100 AS DECIMAL(38,1)), 1), '% vs portfolio ', FORMAT_NUMBER(CAST(portfolio_cm_pct * 100 AS DECIMAL(38,1)), 1), '%, revenue share below customer share'),\n",
