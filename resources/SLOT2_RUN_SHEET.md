@@ -1,12 +1,12 @@
 # Lakelink Fiber Margin Truth - Slot 2 run-sheet (DEC-120 slot, 2026-11-18 15:00-16:05 UTC)
 
-Owner: @pm (DEC-129, answers COO-Q-20261117-81). Written 2026-11-17 ~22:1x UTC. Doc-only. Pinned refs (re-taken 2026-11-18 ~04:3x UTC by @designer, QA-F-RUNSHEET-L3-PINS-1118; CEO sheet pin re-taken 2026-11-18 ~08:3x UTC by @designer, DSN-REPIN-CEO-SHEET-0E77-1118, DEC-143(5)): CEO_ACTION_SHEET.md md5 612724d71116 (130 newlines; S5 row l.88; re-pinned 2026-11-18 ~11:5x UTC by @devops, QA-F-SLOT2-PIN-612724D7-1118), REHEARSAL_FALLBACKS.md md5 e3643042981e (362 newlines; re-pinned by @devops, DEVOPS-REPIN-FALLBACKS-512E-1118), scripts/margin_scene3_rule_change_revert.sql md5 45e14f198434. Minute plan rewritten to DEC-137(b) (DSN-SLOT2-RUNSHEET-DEC137-1118).
+Owner: @pm (DEC-129, answers COO-Q-20261117-81). Written 2026-11-17 ~22:1x UTC. Doc-only. Pinned refs (re-taken 2026-11-18 ~04:3x UTC by @designer, QA-F-RUNSHEET-L3-PINS-1118; CEO sheet pin re-taken 2026-11-18 ~08:3x UTC by @designer, DSN-REPIN-CEO-SHEET-0E77-1118, DEC-143(5)): CEO_ACTION_SHEET.md md5 8637762dd3e6 (130 newlines; S5 row l.88; re-pinned 2026-11-18 ~14:4x UTC by @devops, QA-F-SLOT2-PIN-D2655238-1118, after DSN-S7-APP-NO-WALL-LINE-1118), REHEARSAL_FALLBACKS.md md5 e3643042981e (362 newlines; re-pinned by @devops, DEVOPS-REPIN-FALLBACKS-512E-1118), scripts/margin_scene3_rule_change_revert.sql md5 45e14f198434. Minute plan rewritten to DEC-137(b) (DSN-SLOT2-RUNSHEET-DEC137-1118).
 
 Pass-bar constants: CM (MV) = 2,375,095,705.09; Q3 2026 (ledger_quarter 2026-07-01) IP-VPN -6,715,475.88, Legacy Voice -249,532.74 (DEC-127); Margin Genie space 01f1df115a08164aab3ae5f6faac807c, benchmarks 13/13; hero ticket GROOM-1e655052ef; hero trace tr-2b088edfed85d22b2db662a6c0a7c68e (exp 1235449331932066).
 
 ## 0. Read to CEO first at 15:00Z - 8 CEO gates (DEC-134)
 
-Owner: @designer (DSN-SLOT2-CEO-GATES-BLOCK-1118), written 2026-11-18 ~00:3x UTC. Doc-only. Read aloud as leg L0 (15:00-15:05Z, DEC-137(b)); L1 S5 starts as soon as it ends. There is no proven push path (margin_ceo_slack 404, Slack MCP is read-only), so this block is how the gates reach the CEO (DEC-134(b)). Any gate with no CEO answer by its cutoff takes its default with no further escalation. CEO_ACTION_SHEET.md is md5 612724d71116 (130 newlines, see pins above); find sheet lines by grep, not by number.
+Owner: @designer (DSN-SLOT2-CEO-GATES-BLOCK-1118), written 2026-11-18 ~00:3x UTC. Doc-only. Read aloud as leg L0 (15:00-15:05Z, DEC-137(b)); L1 S5 starts as soon as it ends. There is no proven push path (margin_ceo_slack 404, Slack MCP is read-only), so this block is how the gates reach the CEO (DEC-134(b)). Any gate with no CEO answer by its cutoff takes its default with no further escalation. CEO_ACTION_SHEET.md is md5 8637762dd3e6 (130 newlines, see pins above); find sheet lines by grep, not by number.
 
 | Gate | Task code | Exact CEO action | Cutoff (UTC) | Default if no answer | CEO_ACTION_SHEET ref |
 | --- | --- | --- | --- | --- | --- |
@@ -61,3 +61,11 @@ Run order = slot order above (DEC-137(b)): L0 gates > L1 S5 > L2 S6 > L3 Genie O
 * Each verifier above writes status_notes on its task with the evidence id within 15 min of 16:05Z.
 * @pm writes the go/no-go (P6-DRESS-REHEARSAL) at the 16:05Z run and lists every NOT VERIFIED item with its fallback line.
 * Never run the DEC-121(b) queue cleanup unattended; it stays at the 18:00Z cutoff.
+
+## (e) Discover domain and glossary presenter lines (DSN-RUNSHEET-DOMAIN-GLOSSARY-LINES-1118, answers COO-Q-20261118-19)
+
+Owner: @designer, written 2026-11-18 ~13:3x UTC. Doc-only, appended at the end so every existing l.N reference stays valid.
+
+* Discover: open the domain 'Lakelink Fiber' (30075762) and its Margin sub-domains only. Never open the old domain lakelink_margin (2abc9194).
+* $1B Wall: "The $1B Wall is tracked in the margin_onebillion_wall_mv metric view, which reads the same allocated ledger as contribution margin." (Checked 13:3xZ: cdm_tmforum._metrics.margin_onebillion_wall_mv is a METRIC_VIEW built on margin_ledger_mv, which reads margin_ledger_allocated.)
+* Rate Variance, only if asked: "Rate variance is a stretch metric; Genie answers it from carrier invoices, and its page publishes with the rate metric view after the demo." (DEC-031, DEC-049: page 079d1b7a stays DRAFT.)
